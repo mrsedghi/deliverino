@@ -30,19 +30,13 @@ export default async function handler(req, res) {
 
     // Check if Prisma Client is initialized
     if (!prisma) {
-      console.error("Prisma Client not initialized. Please run: npx prisma generate");
+      console.error("Prisma Client not initialized. This usually means:");
+      console.error("1. Prisma Client wasn't generated during build");
+      console.error("2. DATABASE_URL environment variable is missing");
+      console.error("3. Build process didn't run 'prisma generate'");
       return res.status(500).json({
         error: "Database connection error. Please contact support.",
-        message: "Prisma Client not initialized",
-      });
-    }
-
-    // Check if Prisma Client is initialized
-    if (!prisma) {
-      console.error("Prisma Client not initialized. Please run: npx prisma generate");
-      return res.status(500).json({
-        error: "Database connection error. Please contact support.",
-        message: "Prisma Client not initialized. Run: npx prisma generate",
+        message: "Prisma Client not initialized. Check build logs and ensure DATABASE_URL is set.",
       });
     }
 
