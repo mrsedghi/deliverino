@@ -4,11 +4,22 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import haversineDistance from "haversine-distance";
 import { fixLeafletIcons } from "../../lib/leafletFix";
-
-// Fix Leaflet icons on client side only (in useEffect to avoid SSR issues)
-useEffect(() => {
-  fixLeafletIcons();
-}, []);
+import ModeCard from "../ModeCard";
+import WaitingScreen from "../WaitingScreen";
+import {
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Typography,
+  Stack,
+  Card,
+  CardContent,
+  Skeleton,
+  Chip,
+  IconButton,
+} from "@mui/material";
+import { Icon } from "@iconify/react";
 
 // Fixed center pin component
 function FixedCenterPin({ onCenterChange }) {
@@ -28,9 +39,8 @@ function FixedCenterPin({ onCenterChange }) {
   });
 
   return (
-    <div
-      className="fixed-center-pin"
-      style={{
+    <Box
+      sx={{
         position: "absolute",
         top: "50%",
         left: "50%",
@@ -39,29 +49,24 @@ function FixedCenterPin({ onCenterChange }) {
         pointerEvents: "none",
       }}
     >
-      <svg
-        width="32"
-        height="40"
-        viewBox="0 0 32 40"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40C16 40 32 24.837 32 16C32 7.163 24.837 0 16 0Z"
-          fill="#3B82F6"
-        />
-        <circle cx="16" cy="16" r="6" fill="white" />
-      </svg>
-      <div
-        className="bg-white px-3 py-1 rounded shadow-lg text-xs font-mono whitespace-nowrap mt-1"
-        style={{
+      <Icon icon="mdi:map-marker" width={32} height={40} color="#3B82F6" />
+      <Paper
+        elevation={3}
+        sx={{
+          px: 1.5,
+          py: 0.5,
+          mt: 0.5,
           transform: "translateX(-50%)",
           marginLeft: "50%",
+          display: "inline-block",
+          bgcolor: "background.paper",
         }}
       >
-        {currentCenter[0].toFixed(6)}, {currentCenter[1].toFixed(6)}
-      </div>
-    </div>
+        <Typography variant="caption" fontFamily="monospace" color="text.primary">
+          {currentCenter[0].toFixed(6)}, {currentCenter[1].toFixed(6)}
+        </Typography>
+      </Paper>
+    </Box>
   );
 }
 
@@ -82,35 +87,100 @@ function MapWrapper({ center, setCenter }) {
   return <FixedCenterPin onCenterChange={handleCenterChange} />;
 }
 
-// Map container wrapper
-function MapContainerWrapper({ center, setCenter }) {
+// GPS Location Button Component (must be inside MapContainer)
+function GPSLocationButton({ onLocationFound }) {
+  const map = useMap();
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        map.setView([latitude, longitude], 15);
+        if (onLocationFound) {
+          onLocationFound([latitude, longitude]);
+        }
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert("Failed to get your location. Please enable location permissions.");
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  return (
+    <Box
+      className="leaflet-top leaflet-right"
+      sx={{ marginTop: "60px", marginRight: "10px", zIndex: 1000 }}
+    >
+      <Paper elevation={3} sx={{ p: 0.5 }}>
+        <IconButton
+          onClick={handleGetLocation}
+          disabled={isLocating}
+          size="small"
+          sx={{ bgcolor: "background.paper" }}
+          title="Go to my location"
+        >
+          {isLocating ? (
+            <Icon icon="svg-spinners:3-dots-fade" width={24} height={24} />
+          ) : (
+            <Icon icon="mdi:crosshairs-gps" width={24} height={24} />
+          )}
+        </IconButton>
+      </Paper>
+    </Box>
+  );
+}
+
+function MapContainerWrapper({ center, setCenter, onLocationFound }) {
   return (
     <MapContainer
-      center={center}
+      center={center || [35.6892, 51.3890]}
       zoom={13}
-      style={{ width: "100%", height: "100%" }}
-      scrollWheelZoom={true}
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
         url={process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}
-        attribution="&copy; OpenStreetMap contributors"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <MapWrapper center={center} setCenter={setCenter} />
+      <GPSLocationButton onLocationFound={onLocationFound} />
     </MapContainer>
   );
 }
 
 // Main component
 export default function MapWithSearch() {
-  const [mapCenter, setMapCenter] = useState([35.6892, 51.3890]); // Tehran default
+  // Fix Leaflet icons on client side only (in useEffect to avoid SSR issues)
+  useEffect(() => {
+    fixLeafletIcons();
+  }, []);
+
+  const [mapCenter, setMapCenter] = useState([35.6892, 51.3890]);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
   const [step, setStep] = useState("origin"); // "origin" or "destination"
-  const [routeEstimate, setRouteEstimate] = useState(null);
-  const [isEstimating, setIsEstimating] = useState(false);
+  const [availableModes, setAvailableModes] = useState(null);
+  const [selectedMode, setSelectedMode] = useState(null);
+  const [isLoadingModes, setIsLoadingModes] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState(null);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const searchTimeoutRef = useRef(null);
 
   // Search Nominatim
@@ -122,12 +192,7 @@ export default function MapWithSearch() {
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`,
-        {
-          headers: {
-            "User-Agent": "Deliverino App",
-          },
-        }
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
       );
       const data = await response.json();
       setSuggestions(data);
@@ -137,14 +202,17 @@ export default function MapWithSearch() {
     }
   }, []);
 
-  // Handle search input
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      searchNominatim(searchQuery);
+      if (searchQuery) {
+        searchNominatim(searchQuery);
+      } else {
+        setSuggestions([]);
+      }
     }, 300);
 
     return () => {
@@ -153,6 +221,109 @@ export default function MapWithSearch() {
       }
     };
   }, [searchQuery, searchNominatim]);
+
+  // Handle setting location
+  const handleSetLocation = () => {
+    if (step === "origin") {
+      setOrigin({ lat: mapCenter[0], lng: mapCenter[1] });
+      setStep("destination");
+    } else {
+      setDestination({ lat: mapCenter[0], lng: mapCenter[1] });
+      loadAvailableModes();
+    }
+  };
+
+  // Load available modes
+  const loadAvailableModes = async () => {
+    if (!origin || !destination) return;
+
+    setIsLoadingModes(true);
+    try {
+      const response = await fetch("/api/orders/available-modes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin, dest: destination }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAvailableModes(data);
+
+      // Auto-select suggested mode if available
+      if (data.suggestedMode) {
+        const suggestedModeData = data.modes.find((m) => m.mode === data.suggestedMode && m.enabled);
+        if (suggestedModeData) {
+          setSelectedMode(data.suggestedMode);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading available modes:", error);
+      alert("Failed to load delivery modes. Please try again.");
+    } finally {
+      setIsLoadingModes(false);
+    }
+  };
+
+  // Handle order creation
+  const handleCreateOrder = async () => {
+    if (!origin || !destination || !selectedMode) return;
+
+    const selectedModeData = availableModes?.modes.find((m) => m.mode === selectedMode);
+    if (!selectedModeData || !selectedModeData.enabled) {
+      alert("Please select a valid delivery mode.");
+      return;
+    }
+
+    setIsCreatingOrder(true);
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          origin,
+          dest: destination,
+          mode: selectedMode,
+          notes: null,
+          weight: null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      setCreatedOrder(data.order);
+      
+      // Redirect to order status page after showing success message
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.href = `/orders/${data.order.id}`;
+        }
+      }, 2000);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      alert("Failed to create order. Please try again.");
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
+  // Reset workflow
+  const handleReset = () => {
+    setOrigin(null);
+    setDestination(null);
+    setStep("origin");
+    setAvailableModes(null);
+    setSelectedMode(null);
+    setCreatedOrder(null);
+  };
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion) => {
@@ -163,181 +334,226 @@ export default function MapWithSearch() {
     setShowSuggestions(false);
   };
 
-  // Handle set origin/destination
-  const handleSetLocation = () => {
-    if (step === "origin") {
-      setOrigin({ lat: mapCenter[0], lng: mapCenter[1] });
-      setStep("destination");
-      setSearchQuery("");
-      setShowSuggestions(false);
-    } else {
-      setDestination({ lat: mapCenter[0], lng: mapCenter[1] });
-    }
-  };
-
-  // Calculate distance (Haversine fallback for display)
-  const calculateDistance = () => {
-    if (!origin || !destination) return null;
-    return haversineDistance(origin, destination) / 1000; // Convert to km
-  };
-
-  const distance = calculateDistance();
-
-  // Handle route estimation
-  const handleEstimate = async () => {
-    if (!origin || !destination) return;
-
-    setIsEstimating(true);
-    setRouteEstimate(null);
-
-    try {
-      const response = await fetch("/api/route/estimate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          origin,
-          dest: destination,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-      setRouteEstimate(data);
-    } catch (error) {
-      console.error("Error estimating route:", error);
-      // Show error to user (you can add a toast/alert here)
-      alert("Failed to estimate route. Please try again.");
-    } finally {
-      setIsEstimating(false);
-    }
-  };
-
-  // Reset workflow
-  const handleReset = () => {
-    setOrigin(null);
-    setDestination(null);
-    setStep("origin");
-    setSearchQuery("");
-    setRouteEstimate(null);
-  };
-
   return (
-    <div className="relative w-full h-screen flex flex-col">
+    <Box sx={{ position: "relative", width: "100%", height: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Search Bar */}
-      <div className="absolute top-4 left-4 right-4 z-[1000] max-w-md">
-        <div className="relative">
-          <input
-            type="text"
+      <Paper
+        elevation={3}
+        sx={{
+          position: "absolute",
+          top: 16,
+          left: 16,
+          right: 16,
+          maxWidth: 500,
+          zIndex: 2000,
+          mr: "70px",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box sx={{ position: "relative" }}>
+          <TextField
+            fullWidth
+            placeholder="Search for an address..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
-            placeholder="Search for an address..."
-            className="w-full px-4 py-3 rounded-lg shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            InputProps={{
+              startAdornment: <Icon icon="mdi:magnify" width={20} style={{ marginRight: 8 }} />,
+            }}
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto z-[1001]">
+            <Paper
+              elevation={3}
+              sx={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                mt: 1,
+                maxHeight: 240,
+                overflow: "auto",
+                zIndex: 1001,
+                bgcolor: "background.paper",
+              }}
+            >
               {suggestions.map((suggestion, index) => (
-                <button
+                <Box
                   key={index}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                  sx={{
+                    p: 2,
+                    cursor: "pointer",
+                    "&:hover": { bgcolor: "action.hover" },
+                    borderBottom: index < suggestions.length - 1 ? 1 : 0,
+                    borderColor: "divider",
+                  }}
                 >
-                  <div className="font-medium text-sm">{suggestion.display_name}</div>
-                </button>
+                  <Typography variant="body2" fontWeight="medium" color="text.primary">
+                    {suggestion.display_name}
+                  </Typography>
+                </Box>
               ))}
-            </div>
+            </Paper>
           )}
-        </div>
-      </div>
+        </Box>
+      </Paper>
 
       {/* Map */}
-      <div className="flex-1 relative">
-        <MapContainerWrapper center={mapCenter} setCenter={setMapCenter} />
-      </div>
+      <Box sx={{ flex: 1, position: "relative" }}>
+        <MapContainerWrapper 
+          center={mapCenter} 
+          setCenter={setMapCenter}
+          onLocationFound={(location) => {
+            setMapCenter(location);
+            if (step === "origin") {
+              setOrigin({ lat: location[0], lng: location[1] });
+            } else if (step === "destination") {
+              setDestination({ lat: location[0], lng: location[1] });
+            }
+          }}
+        />
+      </Box>
 
       {/* Control Panel */}
-      <div className="absolute bottom-4 left-4 right-4 z-[1000] max-w-md">
-        <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-          <div className="mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">
+      <Paper
+        elevation={6}
+        sx={{
+          position: "absolute",
+          bottom: 16,
+          left: 16,
+          right: 16,
+          maxWidth: 500,
+          zIndex: 1000,
+          p: 2,
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight="medium" gutterBottom color="text.primary">
               Step: {step === "origin" ? "Set Origin" : "Set Destination"}
-            </div>
-            <button
+            </Typography>
+            <Button
+              variant="contained"
+              fullWidth
               onClick={handleSetLocation}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              startIcon={<Icon icon={step === "origin" ? "mdi:map-marker" : "mdi:map-marker-check"} />}
             >
               {step === "origin" ? "Set Origin" : "Set Destination"}
-            </button>
-          </div>
+            </Button>
+          </Box>
 
           {/* Summary Card */}
           {(origin || destination) && (
-            <div className="border-t border-gray-200 pt-4 space-y-2">
-              <div className="text-sm font-medium text-gray-700">Summary</div>
-              {origin && (
-                <div className="text-xs text-gray-600">
-                  <span className="font-medium">Origin:</span> {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
-                </div>
-              )}
-              {destination && (
-                <div className="text-xs text-gray-600">
-                  <span className="font-medium">Destination:</span> {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
-                </div>
-              )}
-              {/* Show Haversine distance if no route estimate yet */}
-              {!routeEstimate && distance !== null && (
-                <div className="text-sm font-medium text-blue-600">
-                  Distance (straight line): {distance.toFixed(2)} km
-                </div>
-              )}
-
-              {/* Show route estimate results */}
-              {routeEstimate && (
-                <div className="space-y-1 pt-2 border-t border-gray-200">
-                  <div className="text-sm font-medium text-green-600">
-                    Route Distance: {routeEstimate.distance_km.toFixed(2)} km
-                  </div>
-                  <div className="text-sm font-medium text-green-600">
-                    Estimated Duration: {routeEstimate.duration_min} minutes
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Method: {routeEstimate.method === "osrm" ? "OSRM" : "Haversine (fallback)"}
-                  </div>
-                </div>
-              )}
-
-              {origin && destination && (
-                <button
-                  onClick={handleEstimate}
-                  disabled={isEstimating}
-                  className={`w-full mt-2 px-4 py-2 rounded-lg transition-colors font-medium ${
-                    isEstimating
-                      ? "bg-gray-400 text-white cursor-not-allowed"
-                      : "bg-green-500 text-white hover:bg-green-600"
-                  }`}
-                >
-                  {isEstimating ? "Estimating..." : "Estimate"}
-                </button>
-              )}
-              <button
-                onClick={handleReset}
-                className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
-              >
-                Reset
-              </button>
-            </div>
+            <Card variant="outlined">
+              <CardContent>
+                <Stack spacing={1}>
+                  {origin && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Origin
+                      </Typography>
+                      <Typography variant="body2" fontFamily="monospace" color="text.primary">
+                        {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
+                      </Typography>
+                    </Box>
+                  )}
+                  {destination && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Destination
+                      </Typography>
+                      <Typography variant="body2" fontFamily="monospace" color="text.primary">
+                        {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
+                      </Typography>
+                    </Box>
+                  )}
+                  {origin && destination && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Distance (Haversine)
+                      </Typography>
+                      <Typography variant="body2" color="text.primary">
+                        {(haversineDistance(origin, destination) / 1000).toFixed(2)} km
+                      </Typography>
+                    </Box>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
           )}
-        </div>
-      </div>
-    </div>
+
+          {/* Available Modes */}
+          {isLoadingModes && (
+            <Stack spacing={1}>
+              <Skeleton variant="rectangular" height={100} />
+              <Skeleton variant="rectangular" height={100} />
+              <Skeleton variant="rectangular" height={100} />
+            </Stack>
+          )}
+
+          {!isLoadingModes && availableModes && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight="medium" gutterBottom color="text.primary">
+                Available Delivery Modes
+              </Typography>
+              <Stack spacing={1}>
+                {availableModes.modes.map((mode) => (
+                  <ModeCard
+                    key={mode.mode}
+                    mode={mode.mode}
+                    fare={mode.fare}
+                    estimatedDuration={mode.estimatedDuration}
+                    enabled={mode.enabled}
+                    reason={mode.reason}
+                    isSelected={selectedMode === mode.mode}
+                    isSuggested={availableModes.suggestedMode === mode.mode}
+                    onClick={() => mode.enabled && setSelectedMode(mode.mode)}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Create Order Button */}
+          {selectedMode && availableModes && (
+            <Button
+              variant="contained"
+              color="success"
+              fullWidth
+              size="large"
+              onClick={handleCreateOrder}
+              disabled={isCreatingOrder}
+              startIcon={isCreatingOrder ? <Icon icon="svg-spinners:3-dots-fade" /> : <Icon icon="mdi:check-circle" />}
+            >
+              {isCreatingOrder ? "Creating Order..." : "Create Order"}
+            </Button>
+          )}
+
+          {/* Reset Button */}
+          {(origin || destination) && (
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={handleReset}
+              startIcon={<Icon icon="mdi:refresh" />}
+            >
+              Reset
+            </Button>
+          )}
+        </Stack>
+      </Paper>
+
+      {/* Waiting Screen */}
+      {createdOrder && (
+        <WaitingScreen
+          orderId={createdOrder.id}
+          onClose={() => setCreatedOrder(null)}
+        />
+      )}
+    </Box>
   );
 }
-

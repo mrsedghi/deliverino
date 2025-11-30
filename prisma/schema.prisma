@@ -38,6 +38,21 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   FAILED
+  DISPATCHING
+  ESCALATE
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum OfferStatus {
+  OFFERED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
 }
 
 model User {
@@ -65,8 +80,9 @@ model Courier {
   rating      Float?      @default(0)
 
   // Relations
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders Order[] @relation("CourierOrders")
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]      @relation("CourierOrders")
+  offers OrderOffer[]
 
   @@map("couriers")
 }
@@ -86,14 +102,35 @@ model Order {
   status      OrderStatus  @default(PENDING)
   notes       String?
   weightKg    Float?
+  paymentMethod PaymentMethod @default(CASH)
+  paid        Boolean      @default(false)
+  paidAt      DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   // Relations
   customer User    @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Cascade)
   courier  Courier? @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
+  offers   OrderOffer[]
 
   @@map("orders")
+}
+
+model OrderOffer {
+  id        String      @id @default(cuid())
+  orderId   String
+  courierId String
+  status    OfferStatus @default(OFFERED)
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier Courier @relation(fields: [courierId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, courierId])
+  @@map("order_offers")
 }
 
 model Setting {

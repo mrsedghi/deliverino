@@ -1,24 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Deliverino - Delivery Service Platform
 
-## Getting Started
+A full-stack delivery service application built with Next.js, featuring real-time order tracking, courier management, and admin dashboard.
 
-First, run the development server:
+## Features
 
+- 🚚 Real-time order tracking with Socket.io
+- 📱 Progressive Web App (PWA) support
+- 🗺️ Interactive map with OpenStreetMap
+- 👤 OTP-based authentication
+- 💳 Payment processing (Cash/Card)
+- 📊 Admin dashboard with statistics
+- 🎨 Material-UI with dark mode support
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ and pnpm
+- PostgreSQL database
+- (Optional) OSRM routing service
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <your-repo-url>
+cd deliverino
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+pnpm install
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Set up the database:
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+5. Run the development server:
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to see the application.
+
+## Deployment
+
+### Vercel (Recommended)
+
+See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed deployment instructions.
+
+Quick deploy:
+1. Push your code to GitHub
+2. Import project on [vercel.com](https://vercel.com)
+3. Add environment variables in Vercel dashboard
+4. Deploy!
+
+## Environment Variables
+
+See `.env.example` for all required environment variables.
+
+**Required:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - Secret key for JWT tokens
+
+**Optional:**
+- `NEXT_PUBLIC_MAP_TILE_URL` - Map tile service URL
+- `NEXT_PUBLIC_OSRM_BASE_URL` - Routing service URL
+- `NEXT_PUBLIC_SOCKET_URL` - Socket.io server URL
 
 ## Learn More
 
