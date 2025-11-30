@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import haversineDistance from "haversine-distance";
-import "../../lib/leafletFix";
+import { fixLeafletIcons } from "../../lib/leafletFix";
+
+// Fix Leaflet icons on client side only (in useEffect to avoid SSR issues)
+useEffect(() => {
+  fixLeafletIcons();
+}, []);
 
 // Fixed center pin component
 function FixedCenterPin({ onCenterChange }) {
