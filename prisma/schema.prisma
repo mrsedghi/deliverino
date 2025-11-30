@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  COURIER
+  ADMIN
+}
+
+enum VehicleType {
+  WALKING
+  SCOOTER
+  BICYCLE
+  MOTORCYCLE
+  CAR
+}
+
+enum DeliveryMode {
+  STANDARD
+  EXPRESS
+  SCHEDULED
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String
+  role      UserRole @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ordersAsCustomer Order[]  @relation("CustomerOrders")
+  courierProfile   Courier?
+
+  @@map("users")
+}
+
+model Courier {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  vehicleType VehicleType
+  active      Boolean     @default(true)
+  locationLat Float?
+  locationLng Float?
+  rating      Float?      @default(0)
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[] @relation("CourierOrders")
+
+  @@map("couriers")
+}
+
+model Order {
+  id          String       @id @default(cuid())
+  customerId  String
+  courierId   String?
+  originLat   Float
+  originLng   Float
+  destLat     Float
+  destLng     Float
+  distanceKm Float?
+  durationMin Int?
+  mode        DeliveryMode @default(STANDARD)
+  fare        Float?
+  status      OrderStatus  @default(PENDING)
+  notes       String?
+  weightKg    Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  customer User    @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Cascade)
+  courier  Courier? @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
+
+  @@map("orders")
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  @@map("settings")
+}
+
