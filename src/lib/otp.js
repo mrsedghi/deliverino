@@ -52,16 +52,14 @@ export function generateOTPForPhone(phone) {
     lastSent: new Date(),
   });
 
-  // In development, log the OTP (remove in production)
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[OTP] Code for ${phone}: ${code} (expires in ${OTP_CONFIG.expiryMinutes} minutes)`);
-  }
+  // Log the OTP in all environments (for debugging/testing)
+  console.log(`[OTP] Code for ${phone}: ${code} (expires in ${OTP_CONFIG.expiryMinutes} minutes)`);
 
   // TODO: Send SMS via provider (Twilio, AWS SNS, etc.)
   // await sendSMS(phone, `Your verification code is: ${code}`);
 
   return {
-    code, // Only return in development
+    code, // Always return code (for all environments - development, production, etc.)
     expiresAt,
     message: 'OTP sent successfully',
   };

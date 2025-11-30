@@ -24,20 +24,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // Generate OTP
-    const otpResult = generateOTPForPhone(cleanPhone);
+        // Generate OTP
+        const otpResult = generateOTPForPhone(cleanPhone);
 
-    // In development, return the OTP code for testing
-    const response = {
-      message: otpResult.message,
-      expiresAt: otpResult.expiresAt,
-    };
+        // Always return the OTP code (for all environments - development, production, etc.)
+        // This allows users to see the OTP code in the UI for testing/verification
+        const response = {
+          message: otpResult.message,
+          expiresAt: otpResult.expiresAt,
+          code: otpResult.code, // Always include code in all environments
+        };
 
-    if (process.env.NODE_ENV === "development") {
-      response.code = otpResult.code; // Only in development
-    }
-
-    return res.status(200).json(response);
+        return res.status(200).json(response);
   } catch (error) {
     console.error("Error in send-otp:", error);
     return res.status(500).json({

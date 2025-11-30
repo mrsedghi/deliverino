@@ -87,11 +87,15 @@ export default function OTPLogin() {
         });
       }, 1000);
 
-      // Show OTP code in Snackbar if available (for development/testing)
+      // Show OTP code in Snackbar (always show in all environments)
       if (data.code) {
         setOtpCode(data.code);
         setSnackbarOpen(true);
-        console.log("OTP Code (dev only):", data.code);
+        console.log("OTP Code:", data.code);
+      } else {
+        // If code is not in response, still show snackbar with message
+        setOtpCode("Check your phone for SMS");
+        setSnackbarOpen(true);
       }
     } catch (error) {
       setError(error.message);
@@ -525,9 +529,10 @@ export default function OTPLogin() {
         {/* OTP Code Snackbar */}
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={10000}
+          autoHideDuration={null}
           onClose={() => setSnackbarOpen(false)}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          ClickAwayListenerProps={{ onClickAway: () => {} }}
         >
           <Alert
             onClose={() => setSnackbarOpen(false)}
@@ -543,7 +548,7 @@ export default function OTPLogin() {
               {otpCode}
             </Typography>
             <Typography variant="caption" display="block" sx={{ mt: 1, opacity: 0.9 }}>
-              (Development mode - This will not appear in production)
+              Click the X button to close
             </Typography>
           </Alert>
         </Snackbar>
