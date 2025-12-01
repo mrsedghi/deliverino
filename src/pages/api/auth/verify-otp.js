@@ -1,7 +1,6 @@
 import { verifyOTP } from "@/lib/otp";
 import { prisma } from "@/lib/prisma";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
+import { generateToken } from "@/lib/jwt";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -47,11 +46,10 @@ export default async function handler(req, res) {
 
     if (!user) {
       // Create new user
-      if (!name || name.trim() === "") {
-        return res.status(400).json({ error: "Name is required for new users" });
-      }
-
+      // For new users, use provided name or generate a default from phone
+      const userName = name?.trim() || `User ${cleanPhone.slice(-4)}`; // Use last 4 digits
       const defaultRole = role || "CUSTOMER";
+      
       if (!["CUSTOMER", "COURIER", "ADMIN"].includes(defaultRole)) {
         return res.status(400).json({ error: "Invalid role" });
       }
@@ -59,23 +57,19 @@ export default async function handler(req, res) {
       user = await prisma.user.create({
         data: {
           phone: cleanPhone,
-          name: name.trim(),
+          name: userName,
           role: defaultRole,
           // No password needed for OTP auth
         },
       });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        phone: user.phone,
-        role: user.role,
-      },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "30d" }
-    );
+    // Generate JWT token using centralized function
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      role: user.role,
+    });
 
     return res.status(200).json({
       success: true,

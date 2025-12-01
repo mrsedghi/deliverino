@@ -1,4 +1,4 @@
-import withPWA from 'next-pwa';
+import withPWA from "next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -6,27 +6,27 @@ const nextConfig = {
   reactCompiler: true,
   // Explicitly disable Turbopack to ensure webpack is used
   // next-pwa requires webpack and doesn't work with Turbopack
-  experimental: {
-    turbo: false, // Disable Turbopack - next-pwa requires webpack
-  },
+  productionBrowserSourceMaps: false,
+
   // Explicitly configure webpack to ensure next-pwa works correctly
   webpack: (config, { isServer }) => {
     // Ensure webpack is used (required for next-pwa)
+    config.devtool = false; // مهم
     return config;
   },
 };
 
 const pwaConfig = withPWA({
-  dest: 'public',
+  dest: "public",
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development', // Disable PWA in development
+  disable: process.env.NODE_ENV === "development", // Disable PWA in development
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
-      handler: 'NetworkFirst',
+      handler: "NetworkFirst",
       options: {
-        cacheName: 'map-tiles',
+        cacheName: "map-tiles",
         expiration: {
           maxEntries: 50, // Limit cache size
           maxAgeSeconds: 24 * 60 * 60, // 24 hours
@@ -39,9 +39,9 @@ const pwaConfig = withPWA({
     },
     {
       urlPattern: /^https:\/\/nominatim\.openstreetmap\.org\/.*/i,
-      handler: 'NetworkFirst',
+      handler: "NetworkFirst",
       options: {
-        cacheName: 'nominatim-cache',
+        cacheName: "nominatim-cache",
         expiration: {
           maxEntries: 100,
           maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
@@ -50,9 +50,9 @@ const pwaConfig = withPWA({
     },
     {
       urlPattern: /^https:\/\/.*\.osrm\.org\/.*/i,
-      handler: 'NetworkFirst',
+      handler: "NetworkFirst",
       options: {
-        cacheName: 'osrm-cache',
+        cacheName: "osrm-cache",
         expiration: {
           maxEntries: 50,
           maxAgeSeconds: 60 * 60, // 1 hour
@@ -61,9 +61,9 @@ const pwaConfig = withPWA({
     },
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-      handler: 'CacheFirst',
+      handler: "CacheFirst",
       options: {
-        cacheName: 'images',
+        cacheName: "images",
         expiration: {
           maxEntries: 100,
           maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
@@ -72,9 +72,9 @@ const pwaConfig = withPWA({
     },
     {
       urlPattern: /\/_next\/static\/.*/,
-      handler: 'CacheFirst',
+      handler: "CacheFirst",
       options: {
-        cacheName: 'next-static',
+        cacheName: "next-static",
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
@@ -83,9 +83,9 @@ const pwaConfig = withPWA({
     },
     {
       urlPattern: /\/api\/.*/,
-      handler: 'NetworkFirst',
+      handler: "NetworkFirst",
       options: {
-        cacheName: 'api-cache',
+        cacheName: "api-cache",
         expiration: {
           maxEntries: 50,
           maxAgeSeconds: 5 * 60, // 5 minutes
@@ -95,10 +95,10 @@ const pwaConfig = withPWA({
     },
   ],
   fallbacks: {
-    document: '/offline.html',
+    document: "/offline.html",
   },
   buildExcludes: [/middleware-manifest\.json$/],
-  publicExcludes: ['!noprecache/**/*'],
+  publicExcludes: ["!noprecache/**/*"],
 });
 
 export default pwaConfig(nextConfig);

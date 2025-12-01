@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  useMap,
+  useMapEvents,
+  Marker,
+  Popup,
+} from "react-leaflet";
+import { Icon as LeafletIcon } from "leaflet";
 import haversineDistance from "haversine-distance";
 import { fixLeafletIcons } from "../../lib/leafletFix";
 import ModeCard from "../ModeCard";
@@ -62,7 +70,11 @@ function FixedCenterPin({ onCenterChange }) {
           bgcolor: "background.paper",
         }}
       >
-        <Typography variant="caption" fontFamily="monospace" color="text.primary">
+        <Typography
+          variant="caption"
+          fontFamily="monospace"
+          color="text.primary"
+        >
           {currentCenter[0].toFixed(6)}, {currentCenter[1].toFixed(6)}
         </Typography>
       </Paper>
@@ -80,9 +92,12 @@ function MapWrapper({ center, setCenter }) {
     }
   }, [center, map]);
 
-  const handleCenterChange = useCallback((newCenter) => {
-    setCenter(newCenter);
-  }, [setCenter]);
+  const handleCenterChange = useCallback(
+    (newCenter) => {
+      setCenter(newCenter);
+    },
+    [setCenter]
+  );
 
   return <FixedCenterPin onCenterChange={handleCenterChange} />;
 }
@@ -110,7 +125,9 @@ function GPSLocationButton({ onLocationFound }) {
       },
       (error) => {
         console.error("Error getting location:", error);
-        alert("Failed to get your location. Please enable location permissions.");
+        alert(
+          "Failed to get your location. Please enable location permissions."
+        );
         setIsLocating(false);
       },
       {
@@ -124,7 +141,11 @@ function GPSLocationButton({ onLocationFound }) {
   return (
     <Box
       className="leaflet-top leaflet-right"
-      sx={{ marginTop: "60px", marginRight: "10px", zIndex: 1000 }}
+      sx={{
+        marginTop: { xs: "110px", sm: "80px" }, // Below user card (56px + 44px on mobile, 16px + 56px on desktop)
+        marginRight: "10px",
+        zIndex: 1000,
+      }}
     >
       <Paper elevation={3} sx={{ p: 0.5 }}>
         <IconButton
@@ -145,19 +166,85 @@ function GPSLocationButton({ onLocationFound }) {
   );
 }
 
-function MapContainerWrapper({ center, setCenter, onLocationFound }) {
+// Origin and Destination Markers Component
+function LocationMarkers({ origin, destination }) {
+  // Create custom icons for origin and destination
+  const originIcon = new LeafletIcon({
+    iconUrl:
+      "data:image/svg+xml;base64," +
+      btoa(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 24 24" fill="#10b981">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+    `),
+    iconSize: [32, 40],
+    iconAnchor: [16, 40],
+    popupAnchor: [0, -40],
+  });
+
+  const destinationIcon = new LeafletIcon({
+    iconUrl:
+      "data:image/svg+xml;base64," +
+      btoa(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 24 24" fill="#ef4444">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+    `),
+    iconSize: [32, 40],
+    iconAnchor: [16, 40],
+    popupAnchor: [0, -40],
+  });
+
+  return (
+    <>
+      {origin && (
+        <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
+          <Popup>
+            <strong>Origin</strong>
+            <br />
+            {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
+          </Popup>
+        </Marker>
+      )}
+      {destination && (
+        <Marker
+          position={[destination.lat, destination.lng]}
+          icon={destinationIcon}
+        >
+          <Popup>
+            <strong>Destination</strong>
+            <br />
+            {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
+          </Popup>
+        </Marker>
+      )}
+    </>
+  );
+}
+
+function MapContainerWrapper({
+  center,
+  setCenter,
+  onLocationFound,
+  origin,
+  destination,
+}) {
   return (
     <MapContainer
-      center={center || [35.6892, 51.3890]}
+      center={center || [35.6892, 51.389]}
       zoom={13}
       style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
-        url={process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}
+        url={
+          process.env.NEXT_PUBLIC_MAP_TILE_URL ||
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        }
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <MapWrapper center={center} setCenter={setCenter} />
       <GPSLocationButton onLocationFound={onLocationFound} />
+      <LocationMarkers origin={origin} destination={destination} />
     </MapContainer>
   );
 }
@@ -169,7 +256,7 @@ export default function MapWithSearch() {
     fixLeafletIcons();
   }, []);
 
-  const [mapCenter, setMapCenter] = useState([35.6892, 51.3890]);
+  const [mapCenter, setMapCenter] = useState([35.6892, 51.389]);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -192,7 +279,9 @@ export default function MapWithSearch() {
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          query
+        )}&format=json&addressdetails=1&limit=5`
       );
       const data = await response.json();
       setSuggestions(data);
@@ -254,7 +343,9 @@ export default function MapWithSearch() {
 
       // Auto-select suggested mode if available
       if (data.suggestedMode) {
-        const suggestedModeData = data.modes.find((m) => m.mode === data.suggestedMode && m.enabled);
+        const suggestedModeData = data.modes.find(
+          (m) => m.mode === data.suggestedMode && m.enabled
+        );
         if (suggestedModeData) {
           setSelectedMode(data.suggestedMode);
         }
@@ -271,20 +362,34 @@ export default function MapWithSearch() {
   const handleCreateOrder = async () => {
     if (!origin || !destination || !selectedMode) return;
 
-    const selectedModeData = availableModes?.modes.find((m) => m.mode === selectedMode);
+    const selectedModeData = availableModes?.modes.find(
+      (m) => m.mode === selectedMode
+    );
     if (!selectedModeData || !selectedModeData.enabled) {
       alert("Please select a valid delivery mode.");
+      return;
+    }
+
+    // Get auth token from localStorage
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    if (!token) {
+      alert("Please login first to create an order.");
       return;
     }
 
     setIsCreatingOrder(true);
 
     try {
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           origin,
           dest: destination,
@@ -295,21 +400,22 @@ export default function MapWithSearch() {
       });
 
       if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API returned ${response.status}`);
       }
 
       const data = await response.json();
       setCreatedOrder(data.order);
-      
+
       // Redirect to order status page after showing success message
       setTimeout(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
           window.location.href = `/orders/${data.order.id}`;
         }
       }, 2000);
     } catch (error) {
       console.error("Error creating order:", error);
-      alert("Failed to create order. Please try again.");
+      alert(error.message || "Failed to create order. Please try again.");
     } finally {
       setIsCreatingOrder(false);
     }
@@ -335,19 +441,33 @@ export default function MapWithSearch() {
   };
 
   return (
-    <Box sx={{ position: "relative", width: "100%", height: "100vh", display: "flex", flexDirection: "column" }}>
+    <Box
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* Search Bar */}
       <Paper
-        elevation={3}
+        elevation={4}
         sx={{
           position: "absolute",
-          top: 16,
-          left: 16,
-          right: 16,
-          maxWidth: 500,
+          top: { xs: 8, sm: 16 },
+          left: { xs: 8, sm: 16 },
+          right: { xs: 8, sm: 360 }, // Leave space for user card on larger screens
+          maxWidth: { xs: "calc(100% - 16px)", sm: 500 },
           zIndex: 2000,
-          mr: "70px",
           bgcolor: "background.paper",
+          borderRadius: 2,
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+          // Ensure it doesn't overlap with user card on mobile
+          "@media (max-width: 600px)": {
+            right: 8,
+            maxWidth: "calc(100% - 16px)",
+          },
         }}
       >
         <Box sx={{ position: "relative" }}>
@@ -360,23 +480,46 @@ export default function MapWithSearch() {
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
+            variant="outlined"
+            size="small"
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+                bgcolor: "background.paper",
+                "&:hover": {
+                  bgcolor: "background.paper",
+                },
+                "&.Mui-focused": {
+                  bgcolor: "background.paper",
+                },
+              },
+            }}
             InputProps={{
-              startAdornment: <Icon icon="mdi:magnify" width={20} style={{ marginRight: 8 }} />,
+              startAdornment: (
+                <Icon
+                  icon="mdi:magnify"
+                  width={20}
+                  style={{ marginRight: 8, color: "inherit", opacity: 0.7 }}
+                />
+              ),
             }}
           />
           {showSuggestions && suggestions.length > 0 && (
             <Paper
-              elevation={3}
+              elevation={4}
               sx={{
                 position: "absolute",
                 top: "100%",
                 left: 0,
                 right: 0,
-                mt: 1,
-                maxHeight: 240,
+                mt: 0.5,
+                maxHeight: 280,
                 overflow: "auto",
                 zIndex: 1001,
                 bgcolor: "background.paper",
+                borderRadius: 2,
+                border: 1,
+                borderColor: "divider",
               }}
             >
               {suggestions.map((suggestion, index) => (
@@ -391,7 +534,11 @@ export default function MapWithSearch() {
                     borderColor: "divider",
                   }}
                 >
-                  <Typography variant="body2" fontWeight="medium" color="text.primary">
+                  <Typography
+                    variant="body2"
+                    fontWeight="medium"
+                    color="text.primary"
+                  >
                     {suggestion.display_name}
                   </Typography>
                 </Box>
@@ -403,9 +550,11 @@ export default function MapWithSearch() {
 
       {/* Map */}
       <Box sx={{ flex: 1, position: "relative" }}>
-        <MapContainerWrapper 
-          center={mapCenter} 
+        <MapContainerWrapper
+          center={mapCenter}
           setCenter={setMapCenter}
+          origin={origin}
+          destination={destination}
           onLocationFound={(location) => {
             setMapCenter(location);
             if (step === "origin") {
@@ -433,14 +582,27 @@ export default function MapWithSearch() {
       >
         <Stack spacing={2}>
           <Box>
-            <Typography variant="subtitle2" fontWeight="medium" gutterBottom color="text.primary">
+            <Typography
+              variant="subtitle2"
+              fontWeight="medium"
+              gutterBottom
+              color="text.primary"
+            >
               Step: {step === "origin" ? "Set Origin" : "Set Destination"}
             </Typography>
             <Button
               variant="contained"
               fullWidth
               onClick={handleSetLocation}
-              startIcon={<Icon icon={step === "origin" ? "mdi:map-marker" : "mdi:map-marker-check"} />}
+              startIcon={
+                <Icon
+                  icon={
+                    step === "origin"
+                      ? "mdi:map-marker"
+                      : "mdi:map-marker-check"
+                  }
+                />
+              }
             >
               {step === "origin" ? "Set Origin" : "Set Destination"}
             </Button>
@@ -456,7 +618,11 @@ export default function MapWithSearch() {
                       <Typography variant="caption" color="text.secondary">
                         Origin
                       </Typography>
-                      <Typography variant="body2" fontFamily="monospace" color="text.primary">
+                      <Typography
+                        variant="body2"
+                        fontFamily="monospace"
+                        color="text.primary"
+                      >
                         {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
                       </Typography>
                     </Box>
@@ -466,8 +632,13 @@ export default function MapWithSearch() {
                       <Typography variant="caption" color="text.secondary">
                         Destination
                       </Typography>
-                      <Typography variant="body2" fontFamily="monospace" color="text.primary">
-                        {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
+                      <Typography
+                        variant="body2"
+                        fontFamily="monospace"
+                        color="text.primary"
+                      >
+                        {destination.lat.toFixed(6)},{" "}
+                        {destination.lng.toFixed(6)}
                       </Typography>
                     </Box>
                   )}
@@ -477,7 +648,10 @@ export default function MapWithSearch() {
                         Distance (Haversine)
                       </Typography>
                       <Typography variant="body2" color="text.primary">
-                        {(haversineDistance(origin, destination) / 1000).toFixed(2)} km
+                        {(
+                          haversineDistance(origin, destination) / 1000
+                        ).toFixed(2)}{" "}
+                        km
                       </Typography>
                     </Box>
                   )}
@@ -497,7 +671,12 @@ export default function MapWithSearch() {
 
           {!isLoadingModes && availableModes && (
             <Box>
-              <Typography variant="subtitle2" fontWeight="medium" gutterBottom color="text.primary">
+              <Typography
+                variant="subtitle2"
+                fontWeight="medium"
+                gutterBottom
+                color="text.primary"
+              >
                 Available Delivery Modes
               </Typography>
               <Stack spacing={1}>
@@ -527,7 +706,13 @@ export default function MapWithSearch() {
               size="large"
               onClick={handleCreateOrder}
               disabled={isCreatingOrder}
-              startIcon={isCreatingOrder ? <Icon icon="svg-spinners:3-dots-fade" /> : <Icon icon="mdi:check-circle" />}
+              startIcon={
+                isCreatingOrder ? (
+                  <Icon icon="svg-spinners:3-dots-fade" />
+                ) : (
+                  <Icon icon="mdi:check-circle" />
+                )
+              }
             >
               {isCreatingOrder ? "Creating Order..." : "Create Order"}
             </Button>

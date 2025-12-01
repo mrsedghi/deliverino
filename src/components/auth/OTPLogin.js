@@ -110,10 +110,19 @@ export default function OTPLogin() {
     setIsLoading(true);
 
     try {
+      // Generate a default name from phone (last 4 digits)
+      // In production, you might want to ask for name separately
+      const defaultName = `User ${phone.slice(-4)}`;
+      
       const response = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: otp, role: selectedRole }),
+        body: JSON.stringify({ 
+          phone, 
+          code: otp, 
+          role: selectedRole,
+          name: defaultName, // Use last 4 digits as default name
+        }),
       });
 
       if (!response.ok) {

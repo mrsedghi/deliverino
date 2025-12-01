@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { dispatchOrder } from "@/lib/dispatch";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import "@/lib/dispatch-job"; // Start background job
 
 export default async function handler(req, res) {
@@ -8,7 +9,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { origin, dest, mode, notes, weight, customerId } = req.body;
+    // Authenticate user and get customerId from token
+    const { user, error: authError } = await authenticateRequest(req);
+    
+    if (authError) {
+      return res.status(authError.status).json({ error: authError.message });
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Only CUSTOMER role can create orders
+    if (user.role !== "CUSTOMER") {
+      return res.status(403).json({ 
+        error: "Only customers can create orders" 
+      });
+    }
+
+    const { origin, dest, mode, notes, weight } = req.body;
+    const customerId = user.id; // Get from authenticated user
 
     // Validate required fields
     if (!origin || typeof origin.lat !== "number" || typeof origin.lng !== "number") {
@@ -55,7 +75,7 @@ export default async function handler(req, res) {
     // Create order in database
     const order = await prisma.order.create({
       data: {
-        customerId: customerId || "temp-customer-id", // TODO: Get from auth token
+        customerId: customerId, // From authenticated user
         originLat: origin.lat,
         originLng: origin.lng,
         destLat: dest.lat,
