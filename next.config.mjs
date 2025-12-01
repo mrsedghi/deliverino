@@ -8,6 +8,10 @@ const nextConfig = {
   // next-pwa requires webpack and doesn't work with Turbopack
   productionBrowserSourceMaps: false,
 
+  // Add empty turbopack config to silence the warning
+  // We're using --webpack flag in build command instead
+  turbopack: {},
+
   // Explicitly configure webpack to ensure next-pwa works correctly
   webpack: (config, { isServer }) => {
     // Ensure webpack is used (required for next-pwa)
