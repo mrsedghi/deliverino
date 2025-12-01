@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "prisma generate && next build --webpack",
+    "build": "prisma generate && next build ",
     "start": "next start",
     "lint": "eslint",
-    "vercel-build": "prisma generate && next build --webpack"
+    "vercel-build": "prisma generate && next build "
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
