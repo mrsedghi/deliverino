@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         customer: {
           select: {
             id: true,
-            name: true,
+            fullName: true,
             phone: true,
           },
         },

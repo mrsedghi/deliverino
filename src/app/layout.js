@@ -1,6 +1,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 import ThemeProvider from "@/components/ThemeProvider";
 
 const geistSans = Geist({

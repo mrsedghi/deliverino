@@ -287,11 +287,11 @@ function OrderStatusPageContent() {
         <Box sx={{ mb: 3, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar sx={{ bgcolor: "primary.main" }}>
-              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+              {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
             </Avatar>
             <Box>
               <Typography variant="h6" fontWeight="bold" color="text.primary">
-                {user?.name || "User"}
+                {user?.fullName || "User"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {user?.phone}
@@ -415,7 +415,7 @@ function OrderStatusPageContent() {
                     Assigned Courier
                   </Typography>
                   <Typography variant="body1" fontWeight="medium" color="text.primary">
-                    {order.courier.user?.name || "Courier"} • {order.courier.vehicleType}
+                    {order.courier.user?.fullName || "Courier"} • {order.courier.vehicleType}
                   </Typography>
                 </Paper>
               )}

@@ -26,8 +26,12 @@ import {
   Skeleton,
   Chip,
   IconButton,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination } from "swiper/modules";
 
 // Fixed center pin component
 function FixedCenterPin({ onCenterChange }) {
@@ -57,27 +61,7 @@ function FixedCenterPin({ onCenterChange }) {
         pointerEvents: "none",
       }}
     >
-      <Icon icon="mdi:map-marker" width={32} height={40} color="#3B82F6" />
-      <Paper
-        elevation={3}
-        sx={{
-          px: 1.5,
-          py: 0.5,
-          mt: 0.5,
-          transform: "translateX(-50%)",
-          marginLeft: "50%",
-          display: "inline-block",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Typography
-          variant="caption"
-          fontFamily="monospace"
-          color="text.primary"
-        >
-          {currentCenter[0].toFixed(6)}, {currentCenter[1].toFixed(6)}
-        </Typography>
-      </Paper>
+      <Icon icon="mdi:map-marker" width={34} height={44} color="#3B82F6" />
     </Box>
   );
 }
@@ -142,9 +126,10 @@ function GPSLocationButton({ onLocationFound }) {
     <Box
       className="leaflet-top leaflet-right"
       sx={{
-        marginTop: { xs: "110px", sm: "80px" }, // Below user card (56px + 44px on mobile, 16px + 56px on desktop)
-        marginRight: "10px",
-        zIndex: 1000,
+        // Keep it below the profile card (which is top-right on the page)
+        marginTop: { xs: "132px", sm: "96px" },
+        marginRight: { xs: "20px", sm: "20px" },
+        zIndex: 1500,
       }}
     >
       <Paper elevation={3} sx={{ p: 0.5 }}>
@@ -201,8 +186,6 @@ function LocationMarkers({ origin, destination }) {
         <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
           <Popup>
             <strong>Origin</strong>
-            <br />
-            {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
           </Popup>
         </Marker>
       )}
@@ -213,8 +196,6 @@ function LocationMarkers({ origin, destination }) {
         >
           <Popup>
             <strong>Destination</strong>
-            <br />
-            {destination.lat.toFixed(6)}, {destination.lng.toFixed(6)}
           </Popup>
         </Marker>
       )}
@@ -262,13 +243,15 @@ export default function MapWithSearch() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
-  const [step, setStep] = useState("origin"); // "origin" or "destination"
+  const [step, setStep] = useState("origin"); // "origin" | "destination" | "modes"
   const [availableModes, setAvailableModes] = useState(null);
   const [selectedMode, setSelectedMode] = useState(null);
   const [isLoadingModes, setIsLoadingModes] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const searchTimeoutRef = useRef(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Search Nominatim
   const searchNominatim = useCallback(async (query) => {
@@ -311,27 +294,18 @@ export default function MapWithSearch() {
     };
   }, [searchQuery, searchNominatim]);
 
-  // Handle setting location
-  const handleSetLocation = () => {
-    if (step === "origin") {
-      setOrigin({ lat: mapCenter[0], lng: mapCenter[1] });
-      setStep("destination");
-    } else {
-      setDestination({ lat: mapCenter[0], lng: mapCenter[1] });
-      loadAvailableModes();
-    }
-  };
-
-  // Load available modes
-  const loadAvailableModes = async () => {
-    if (!origin || !destination) return;
+  const loadAvailableModes = async (
+    originParam = origin,
+    destinationParam = destination
+  ) => {
+    if (!originParam || !destinationParam) return;
 
     setIsLoadingModes(true);
     try {
       const response = await fetch("/api/orders/available-modes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origin, dest: destination }),
+        body: JSON.stringify({ origin: originParam, dest: destinationParam }),
       });
 
       if (!response.ok) {
@@ -356,6 +330,39 @@ export default function MapWithSearch() {
     } finally {
       setIsLoadingModes(false);
     }
+  };
+
+  // Handle setting location (confirm steps)
+  const handleSetLocation = () => {
+    if (step === "origin") {
+      const nextOrigin = { lat: mapCenter[0], lng: mapCenter[1] };
+      setOrigin(nextOrigin);
+      setDestination(null);
+      setAvailableModes(null);
+      setSelectedMode(null);
+      setCreatedOrder(null);
+      setStep("destination");
+      return;
+    }
+
+    if (step === "destination") {
+      const nextDestination = { lat: mapCenter[0], lng: mapCenter[1] };
+      setDestination(nextDestination);
+      setAvailableModes(null);
+      setSelectedMode(null);
+      setCreatedOrder(null);
+      setStep("modes");
+      loadAvailableModes(origin, nextDestination);
+      return;
+    }
+  };
+
+  const handleChangeDestination = () => {
+    setDestination(null);
+    setAvailableModes(null);
+    setSelectedMode(null);
+    setCreatedOrder(null);
+    setStep("destination");
   };
 
   // Handle order creation
@@ -448,6 +455,7 @@ export default function MapWithSearch() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
+        bgcolor: "background.default",
       }}
     >
       {/* Search Bar */}
@@ -460,7 +468,11 @@ export default function MapWithSearch() {
           right: { xs: 8, sm: 360 }, // Leave space for user card on larger screens
           maxWidth: { xs: "calc(100% - 16px)", sm: 500 },
           zIndex: 2000,
-          bgcolor: "background.paper",
+          bgcolor: (t) =>
+            t.palette.mode === "dark"
+              ? "rgba(18,18,18,0.88)"
+              : "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(10px)",
           borderRadius: 2,
           boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
           // Ensure it doesn't overlap with user card on mobile
@@ -559,8 +571,15 @@ export default function MapWithSearch() {
             setMapCenter(location);
             if (step === "origin") {
               setOrigin({ lat: location[0], lng: location[1] });
+              setDestination(null);
+              setAvailableModes(null);
+              setSelectedMode(null);
+              setCreatedOrder(null);
+              setStep("destination");
             } else if (step === "destination") {
               setDestination({ lat: location[0], lng: location[1] });
+            } else {
+              // step === "modes": do not overwrite confirmed destination
             }
           }}
         />
@@ -571,16 +590,48 @@ export default function MapWithSearch() {
         elevation={6}
         sx={{
           position: "absolute",
-          bottom: 16,
-          left: 16,
-          right: 16,
-          maxWidth: 500,
+          bottom: { xs: 0, sm: 16 },
+          left: { xs: 0, sm: 16 },
+          right: { xs: 0, sm: "auto" },
+          width: { xs: "100%", sm: 420 },
+          maxWidth: { xs: "100%", sm: 420 },
           zIndex: 1000,
-          p: 2,
-          bgcolor: "background.paper",
+          p: { xs: 1.5, sm: 2 },
+          pt: { xs: 1, sm: 2 },
+          pb: {
+            xs: "calc(env(safe-area-inset-bottom) + 12px)",
+            sm: 2,
+          },
+          bgcolor: (t) =>
+            t.palette.mode === "dark"
+              ? "rgba(18,18,18,0.92)"
+              : "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(12px)",
+          borderTopLeftRadius: { xs: 18, sm: 12 },
+          borderTopRightRadius: { xs: 18, sm: 12 },
+          borderBottomLeftRadius: { xs: 0, sm: 12 },
+          borderBottomRightRadius: { xs: 0, sm: 12 },
+          boxShadow: isMobile
+            ? "0 -12px 28px rgba(0,0,0,0.22)"
+            : "0 10px 28px rgba(0,0,0,0.18)",
+          maxHeight: { xs: "56vh", sm: "auto" },
+          overflow: { xs: "auto", sm: "visible" },
         }}
       >
         <Stack spacing={2}>
+          {/* Mobile sheet handle */}
+          {isMobile && (
+            <Box
+              sx={{
+                width: 44,
+                height: 4,
+                borderRadius: 999,
+                bgcolor: "divider",
+                mx: "auto",
+                mb: 0.5,
+              }}
+            />
+          )}
           <Box>
             <Typography
               variant="subtitle2"
@@ -588,24 +639,49 @@ export default function MapWithSearch() {
               gutterBottom
               color="text.primary"
             >
-              Step: {step === "origin" ? "Set Origin" : "Set Destination"}
+              Step:{" "}
+              {step === "origin"
+                ? "Set Origin"
+                : step === "destination"
+                ? "Confirm Destination"
+                : "Choose Delivery Mode"}
             </Typography>
             <Button
               variant="contained"
               fullWidth
               onClick={handleSetLocation}
+              disabled={step === "modes"}
               startIcon={
                 <Icon
                   icon={
                     step === "origin"
                       ? "mdi:map-marker"
-                      : "mdi:map-marker-check"
+                      : step === "destination"
+                      ? "mdi:map-marker-check"
+                      : "mdi:check-circle"
                   }
                 />
               }
+              sx={{ py: 1.2 }}
             >
-              {step === "origin" ? "Set Origin" : "Set Destination"}
+              {step === "origin"
+                ? "Set Origin"
+                : step === "destination"
+                ? "Confirm Destination"
+                : "Destination Confirmed"}
             </Button>
+
+            {step === "modes" && (
+              <Button
+                sx={{ mt: 1 }}
+                variant="outlined"
+                fullWidth
+                onClick={handleChangeDestination}
+                startIcon={<Icon icon="mdi:pencil" />}
+              >
+                Change Destination
+              </Button>
+            )}
           </Box>
 
           {/* Summary Card */}
@@ -618,13 +694,13 @@ export default function MapWithSearch() {
                       <Typography variant="caption" color="text.secondary">
                         Origin
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        fontFamily="monospace"
-                        color="text.primary"
-                      >
-                        {origin.lat.toFixed(6)}, {origin.lng.toFixed(6)}
-                      </Typography>
+                      <Chip
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        label="Selected"
+                        sx={{ mt: 0.5 }}
+                      />
                     </Box>
                   )}
                   {destination && (
@@ -632,14 +708,13 @@ export default function MapWithSearch() {
                       <Typography variant="caption" color="text.secondary">
                         Destination
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        fontFamily="monospace"
-                        color="text.primary"
-                      >
-                        {destination.lat.toFixed(6)},{" "}
-                        {destination.lng.toFixed(6)}
-                      </Typography>
+                      <Chip
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                        label="Selected"
+                        sx={{ mt: 0.5 }}
+                      />
                     </Box>
                   )}
                   {origin && destination && (
@@ -669,7 +744,7 @@ export default function MapWithSearch() {
             </Stack>
           )}
 
-          {!isLoadingModes && availableModes && (
+          {!isLoadingModes && step === "modes" && availableModes && (
             <Box>
               <Typography
                 variant="subtitle2"
@@ -679,21 +754,47 @@ export default function MapWithSearch() {
               >
                 Available Delivery Modes
               </Typography>
-              <Stack spacing={1}>
-                {availableModes.modes.map((mode) => (
-                  <ModeCard
-                    key={mode.mode}
-                    mode={mode.mode}
-                    fare={mode.fare}
-                    estimatedDuration={mode.estimatedDuration}
-                    enabled={mode.enabled}
-                    reason={mode.reason}
-                    isSelected={selectedMode === mode.mode}
-                    isSuggested={availableModes.suggestedMode === mode.mode}
-                    onClick={() => mode.enabled && setSelectedMode(mode.mode)}
-                  />
-                ))}
-              </Stack>
+              <Box sx={{ mt: 2, mb: 1 }}>
+                <Swiper
+                  modules={[Navigation, Pagination]}
+                  spaceBetween={12}
+                  slidesPerView={1.2}
+                  navigation
+                  pagination={{ clickable: true }}
+                  breakpoints={{
+                    480: {
+                      slidesPerView: 1.5,
+                    },
+                    640: {
+                      slidesPerView: 2,
+                    },
+                    960: {
+                      slidesPerView: 2.5,
+                    },
+                  }}
+                  style={{
+                    paddingBottom: "40px",
+                    touchAction: "pan-y",
+                  }}
+                >
+                  {availableModes.modes.map((mode) => (
+                    <SwiperSlide key={mode.mode}>
+                      <ModeCard
+                        mode={mode.mode}
+                        fare={mode.fare}
+                        estimatedDuration={mode.estimatedDuration}
+                        enabled={mode.enabled}
+                        reason={mode.reason}
+                        isSelected={selectedMode === mode.mode}
+                        isSuggested={availableModes.suggestedMode === mode.mode}
+                        onClick={() =>
+                          mode.enabled && setSelectedMode(mode.mode)
+                        }
+                      />
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              </Box>
             </Box>
           )}
 

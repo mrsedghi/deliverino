@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Box, Typography, CircularProgress } from "@mui/material";
 
 export default function ProtectedRoute({ children, requiredRole = null, redirectTo = "/login" }) {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, isProfileComplete } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -14,6 +14,15 @@ export default function ProtectedRoute({ children, requiredRole = null, redirect
       if (!isAuthenticated) {
         router.push(redirectTo);
         return;
+      }
+
+      // Enforce profile completion (except on the completion page itself)
+      if (!isProfileComplete && typeof window !== "undefined") {
+        const path = window.location?.pathname || "";
+        if (path !== "/profile-completion") {
+          router.push("/profile-completion");
+          return;
+        }
       }
 
       if (requiredRole && user?.role !== requiredRole) {
@@ -28,7 +37,7 @@ export default function ProtectedRoute({ children, requiredRole = null, redirect
         return;
       }
     }
-  }, [isLoading, isAuthenticated, user, requiredRole, router, redirectTo]);
+  }, [isLoading, isAuthenticated, user, requiredRole, router, redirectTo, isProfileComplete]);
 
   if (isLoading) {
     return (
@@ -52,6 +61,10 @@ export default function ProtectedRoute({ children, requiredRole = null, redirect
   }
 
   if (!isAuthenticated) {
+    return null; // Will redirect
+  }
+
+  if (!isProfileComplete) {
     return null; // Will redirect
   }
 

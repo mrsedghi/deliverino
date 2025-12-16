@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { phone, code, name, role } = req.body;
+    const { phone, code, name, fullName, role } = req.body;
 
     if (!phone || !code) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
@@ -47,7 +47,8 @@ export default async function handler(req, res) {
     if (!user) {
       // Create new user
       // For new users, use provided name or generate a default from phone
-      const userName = name?.trim() || `User ${cleanPhone.slice(-4)}`; // Use last 4 digits
+      const requestedName = (typeof fullName === "string" ? fullName : name)?.trim();
+      const userFullName = requestedName || `User ${cleanPhone.slice(-4)}`; // Use last 4 digits
       const defaultRole = role || "CUSTOMER";
       
       if (!["CUSTOMER", "COURIER", "ADMIN"].includes(defaultRole)) {
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
       user = await prisma.user.create({
         data: {
           phone: cleanPhone,
-          name: userName,
+          fullName: userFullName,
           role: defaultRole,
           // No password needed for OTP auth
         },
@@ -77,8 +78,9 @@ export default async function handler(req, res) {
       user: {
         id: user.id,
         phone: user.phone,
-        name: user.name,
+        fullName: user.fullName,
         role: user.role,
+        nationalCode: user.nationalCode || null,
       },
     });
   } catch (error) {

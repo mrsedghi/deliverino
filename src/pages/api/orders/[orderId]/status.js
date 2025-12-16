@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         customer: {
           select: {
             id: true,
-            name: true,
+            fullName: true,
             phone: true,
           },
         },
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
             vehicleType: true,
             user: {
               select: {
-                name: true,
+                fullName: true,
                 phone: true,
               },
             },

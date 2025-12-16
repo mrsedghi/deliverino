@@ -18,15 +18,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Ensure Leaflet zoom controls don't overlap search input */
-.leaflet-top.leaflet-right {
-  margin-top: 60px !important;
-  margin-right: 10px !important;
-  z-index: 1000 !important;
-}
-
 .leaflet-top.leaflet-left {
-  margin-top: 60px !important;
+  margin-top: 80px !important;
   z-index: 1000 !important;
 }
 

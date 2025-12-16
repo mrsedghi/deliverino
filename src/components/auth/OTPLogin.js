@@ -40,6 +40,18 @@ export default function OTPLogin() {
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
+        const fullNameOk =
+          typeof user?.fullName === "string" &&
+          user.fullName.trim().length >= 2 &&
+          !/^User\s+\d{2,}$/.test(user.fullName.trim());
+        const nationalCodeOk =
+          typeof user?.nationalCode === "string" &&
+          user.nationalCode.trim().length > 0;
+
+        if (!fullNameOk || !nationalCodeOk) {
+          router.push("/profile-completion");
+          return;
+        }
         // Redirect based on role
         if (user.role === "ADMIN") {
           router.push("/admin");
@@ -121,7 +133,7 @@ export default function OTPLogin() {
           phone, 
           code: otp, 
           role: selectedRole,
-          name: defaultName, // Use last 4 digits as default name
+          fullName: defaultName, // Use last 4 digits as default name
         }),
       });
 
@@ -138,6 +150,19 @@ export default function OTPLogin() {
 
       // Small delay to ensure localStorage is set
       await new Promise(resolve => setTimeout(resolve, 100));
+
+      const fullNameOk =
+        typeof data?.user?.fullName === "string" &&
+        data.user.fullName.trim().length >= 2 &&
+        !/^User\s+\d{2,}$/.test(data.user.fullName.trim());
+      const nationalCodeOk =
+        typeof data?.user?.nationalCode === "string" &&
+        data.user.nationalCode.trim().length > 0;
+
+      if (!fullNameOk || !nationalCodeOk) {
+        router.push("/profile-completion");
+        return;
+      }
 
       // Redirect based on role
       if (data.user.role === "ADMIN") {

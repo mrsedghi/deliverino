@@ -59,7 +59,8 @@ enum OfferStatus {
 model User {
   id        String   @id @default(cuid())
   phone     String   @unique
-  name      String
+  fullName  String   @map("name")
+  nationalCode String? @unique
   role      UserRole @default(CUSTOMER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

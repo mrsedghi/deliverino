@@ -297,14 +297,14 @@ function AdminPageContent() {
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar sx={{ bgcolor: "primary.main", width: 56, height: 56 }}>
-              {user?.name?.charAt(0)?.toUpperCase() || "A"}
+              {user?.fullName?.charAt(0)?.toUpperCase() || "A"}
             </Avatar>
             <Box>
               <Typography variant="h4" component="h1" fontWeight="bold" color="text.primary">
                 Admin Dashboard
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {user?.name || "Admin"} • {user?.phone}
+                {user?.fullName || "Admin"} • {user?.phone}
               </Typography>
             </Box>
           </Box>

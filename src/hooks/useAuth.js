@@ -42,6 +42,18 @@ export function useAuth() {
   const [isValidating, setIsValidating] = useState(false);
   const router = useRouter();
 
+  const isProfileComplete = (() => {
+    if (!user) return false;
+    const fullNameOk =
+      typeof user.fullName === "string" &&
+      user.fullName.trim().length >= 2 &&
+      !/^User\s+\d{2,}$/.test(user.fullName.trim()); // default placeholder from OTP flow
+    const nationalCodeOk =
+      typeof user.nationalCode === "string" &&
+      user.nationalCode.trim().length > 0;
+    return fullNameOk && nationalCodeOk;
+  })();
+
   // Validate token with server
   const validateToken = useCallback(async (tokenToValidate) => {
     try {
@@ -142,6 +154,7 @@ export function useAuth() {
     isLoading,
     isValidating,
     isAuthenticated,
+    isProfileComplete,
     login,
     logout,
     refreshUser,

@@ -62,7 +62,7 @@ export default async function handler(req, res) {
           select: {
             id: true,
             phone: true,
-            name: true,
+            fullName: true,
           },
         },
       },

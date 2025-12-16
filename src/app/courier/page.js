@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { initSocketClient, subscribeToCourier, disconnectSocket } from "@/lib/socket-client";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { Swiper, SwiperSlide } from "swiper/react";
 import {
   Box,
   Container,
@@ -14,8 +15,6 @@ import {
   CardContent,
   Stack,
   TextField,
-  Select,
-  MenuItem,
   FormControl,
   InputLabel,
   Chip,
@@ -27,8 +26,17 @@ import {
   DialogContent,
   DialogActions,
   Grid,
+  Paper,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
+
+const VEHICLE_TYPES = [
+  { value: "WALKING", label: "Walking", icon: "mdi:walk" },
+  { value: "SCOOTER", label: "Scooter", icon: "mdi:scooter" },
+  { value: "BICYCLE", label: "Bicycle", icon: "mdi:bicycle" },
+  { value: "MOTORCYCLE", label: "Motorcycle", icon: "mdi:motorbike" },
+  { value: "CAR", label: "Car", icon: "mdi:car" },
+];
 
 function CourierPageContent() {
   const router = useRouter();
@@ -41,6 +49,19 @@ function CourierPageContent() {
   const [radius, setRadius] = useState(5);
   const [socketConnected, setSocketConnected] = useState(false);
   const [incomingOffer, setIncomingOffer] = useState(null);
+  const [vehicleSwiper, setVehicleSwiper] = useState(null);
+
+  const vehicleIndex = useMemo(() => {
+    const idx = VEHICLE_TYPES.findIndex((v) => v.value === vehicleType);
+    return idx >= 0 ? idx : 0;
+  }, [vehicleType]);
+
+  useEffect(() => {
+    if (!vehicleSwiper) return;
+    if (vehicleSwiper.destroyed) return;
+    if (vehicleSwiper.activeIndex === vehicleIndex) return;
+    vehicleSwiper.slideTo(vehicleIndex);
+  }, [vehicleSwiper, vehicleIndex]);
 
   // Initialize Socket.io connection
   useEffect(() => {
@@ -252,11 +273,11 @@ function CourierPageContent() {
         <Box sx={{ mb: 3, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar sx={{ bgcolor: "primary.main", width: 56, height: 56 }}>
-              {user?.name?.charAt(0)?.toUpperCase() || "C"}
+              {user?.fullName?.charAt(0)?.toUpperCase() || "C"}
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight="bold" color="text.primary">
-                {user?.name || "Courier"}
+                {user?.fullName || "Courier"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {user?.phone}
@@ -334,17 +355,63 @@ function CourierPageContent() {
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth disabled={isOnline}>
                     <InputLabel>Vehicle Type</InputLabel>
-                    <Select
-                      value={vehicleType}
-                      onChange={(e) => setVehicleType(e.target.value)}
-                      label="Vehicle Type"
-                    >
-                      <MenuItem value="WALKING">Walking</MenuItem>
-                      <MenuItem value="SCOOTER">Scooter</MenuItem>
-                      <MenuItem value="BICYCLE">Bicycle</MenuItem>
-                      <MenuItem value="MOTORCYCLE">Motorcycle</MenuItem>
-                      <MenuItem value="CAR">Car</MenuItem>
-                    </Select>
+                    <Box sx={{ mt: 3 }}>
+                      <Swiper
+                        onSwiper={setVehicleSwiper}
+                        slidesPerView={2.2}
+                        centeredSlides
+                        spaceBetween={12}
+                        allowTouchMove={!isOnline}
+                        style={{ padding: "4px 0", touchAction: "pan-y" }}
+                        breakpoints={{
+                          600: { slidesPerView: 3.2, centeredSlides: false },
+                          900: { slidesPerView: 4.2, centeredSlides: false },
+                        }}
+                        onSlideChange={(swiper) => {
+                          if (isOnline) return;
+                          const next = VEHICLE_TYPES[swiper.activeIndex]?.value;
+                          if (next) setVehicleType(next);
+                        }}
+                      >
+                        {VEHICLE_TYPES.map((v) => {
+                          const selected = vehicleType === v.value;
+                          return (
+                            <SwiperSlide key={v.value}>
+                              <Paper
+                                elevation={selected ? 6 : 1}
+                                onClick={() => !isOnline && setVehicleType(v.value)}
+                                sx={{
+                                  cursor: isOnline ? "not-allowed" : "pointer",
+                                  userSelect: "none",
+                                  p: 1.25,
+                                  borderRadius: 2,
+                                  border: 2,
+                                  borderColor: selected ? "primary.main" : "divider",
+                                  bgcolor: selected ? "action.selected" : "background.paper",
+                                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                                  "&:active": { transform: isOnline ? "none" : "scale(0.98)" },
+                                }}
+                              >
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Icon icon={v.icon} width={22} />
+                                  <Typography variant="subtitle2" fontWeight={700} noWrap>
+                                    {v.label}
+                                  </Typography>
+                                </Stack>
+                                <Box sx={{ mt: 0.75 }}>
+                                  <Chip
+                                    size="small"
+                                    label={selected ? "Selected" : "Tap"}
+                                    color={selected ? "primary" : "default"}
+                                    variant={selected ? "filled" : "outlined"}
+                                  />
+                                </Box>
+                              </Paper>
+                            </SwiperSlide>
+                          );
+                        })}
+                      </Swiper>
+                    </Box>
                   </FormControl>
                 </Grid>
               </Grid>
