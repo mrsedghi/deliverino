@@ -28,6 +28,8 @@ import {
   IconButton,
   useMediaQuery,
   useTheme,
+  Divider,
+  LinearProgress,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -249,9 +251,51 @@ export default function MapWithSearch() {
   const [isLoadingModes, setIsLoadingModes] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [modesError, setModesError] = useState(null);
   const searchTimeoutRef = useRef(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Lightweight step status for responsive “mini stepper”
+  const stepOrder = ["origin", "destination", "modes"];
+  const currentStepIndex = stepOrder.indexOf(step);
+  const progressValue =
+    ((currentStepIndex >= 0 ? currentStepIndex + 1 : 0) / stepOrder.length) *
+    100;
+
+  const stepStatus = {
+    origin: step === "origin" ? "active" : origin ? "done" : "pending",
+    destination:
+      step === "destination"
+        ? "active"
+        : destination
+        ? "done"
+        : origin
+        ? "pending"
+        : "pending",
+    modes: step === "modes" ? "active" : selectedMode ? "done" : "pending",
+  };
+
+  const stepMeta = [
+    {
+      key: "origin",
+      label: "Set Origin",
+      caption: "Center map & confirm",
+      icon: "mdi:map-marker",
+    },
+    {
+      key: "destination",
+      label: "Confirm Destination",
+      caption: "Move map to drop-off",
+      icon: "mdi:map-marker-check",
+    },
+    {
+      key: "modes",
+      label: "Select Mode",
+      caption: "Pick delivery option",
+      icon: "mdi:truck-delivery-outline",
+    },
+  ];
 
   // Search Nominatim
   const searchNominatim = useCallback(async (query) => {
@@ -301,6 +345,7 @@ export default function MapWithSearch() {
     if (!originParam || !destinationParam) return;
 
     setIsLoadingModes(true);
+    setModesError(null);
     try {
       const response = await fetch("/api/orders/available-modes", {
         method: "POST",
@@ -326,6 +371,9 @@ export default function MapWithSearch() {
       }
     } catch (error) {
       console.error("Error loading available modes:", error);
+      setModesError(
+        error?.message || "Failed to load delivery modes. Please try again."
+      );
       alert("Failed to load delivery modes. Please try again.");
     } finally {
       setIsLoadingModes(false);
@@ -341,6 +389,7 @@ export default function MapWithSearch() {
       setAvailableModes(null);
       setSelectedMode(null);
       setCreatedOrder(null);
+      setModesError(null);
       setStep("destination");
       return;
     }
@@ -351,6 +400,7 @@ export default function MapWithSearch() {
       setAvailableModes(null);
       setSelectedMode(null);
       setCreatedOrder(null);
+      setModesError(null);
       setStep("modes");
       loadAvailableModes(origin, nextDestination);
       return;
@@ -362,6 +412,7 @@ export default function MapWithSearch() {
     setAvailableModes(null);
     setSelectedMode(null);
     setCreatedOrder(null);
+    setModesError(null);
     setStep("destination");
   };
 
@@ -615,24 +666,44 @@ export default function MapWithSearch() {
             ? "0 -12px 28px rgba(0,0,0,0.22)"
             : "0 10px 28px rgba(0,0,0,0.18)",
           maxHeight: { xs: "56vh", sm: "auto" },
-          overflow: { xs: "auto", sm: "visible" },
+          overflow: "hidden", // prevent rounded-corner clipping while scrolling
         }}
       >
-        <Stack spacing={2}>
-          {/* Mobile sheet handle */}
-          {isMobile && (
-            <Box
-              sx={{
-                width: 44,
-                height: 4,
-                borderRadius: 999,
-                bgcolor: "divider",
-                mx: "auto",
-                mb: 0.5,
-              }}
-            />
-          )}
-          <Box>
+        <Box
+          sx={{
+            height: "100%",
+            overflow: { xs: "auto", sm: "visible" },
+            pr: { xs: 0.5, sm: 0 }, // tiny padding so scrollbar (if any) doesn't overlap
+          }}
+        >
+          {/* Sticky step section (prevents “cropped” feel on mobile scroll) */}
+          <Box
+            sx={{
+              position: { xs: "sticky", sm: "static" },
+              top: 0,
+              zIndex: 2,
+              bgcolor: (t) =>
+                t.palette.mode === "dark"
+                  ? "rgba(18,18,18,0.96)"
+                  : "rgba(255,255,255,0.98)",
+              backdropFilter: "blur(12px)",
+              pb: 1.25,
+            }}
+          >
+            {/* Mobile sheet handle */}
+            {isMobile && (
+              <Box
+                sx={{
+                  width: 44,
+                  height: 4,
+                  borderRadius: 999,
+                  bgcolor: "divider",
+                  mx: "auto",
+                  mb: 0.75,
+                }}
+              />
+            )}
+
             <Typography
               variant="subtitle2"
               fontWeight="medium"
@@ -646,6 +717,166 @@ export default function MapWithSearch() {
                 ? "Confirm Destination"
                 : "Choose Delivery Mode"}
             </Typography>
+
+            {/* Stepper with progress */}
+            <Box sx={{ mb: 1 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 0.75,
+                  gap: 1,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {currentStepIndex >= 0
+                    ? `Step ${currentStepIndex + 1} of ${stepOrder.length}`
+                    : `Step of ${stepOrder.length}`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {Math.round(progressValue)}%
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={progressValue}
+                sx={{
+                  height: 8,
+                  borderRadius: 999,
+                  bgcolor:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(0,0,0,0.06)",
+                  "& .MuiLinearProgress-bar": {
+                    borderRadius: 999,
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Redesigned horizontal stepper pills */}
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: { xs: "nowrap", md: "wrap" },
+                overflowX: { xs: "auto", md: "visible" },
+                overflowY: "hidden",
+                columnGap: { xs: 1, md: 1.25 },
+                rowGap: { xs: 0, md: 1.25 },
+                mb: 1,
+                pb: 0.5,
+                pr: { xs: 0.5, md: 0 },
+                scrollSnapType: { xs: "x mandatory", md: "none" },
+                "&::-webkit-scrollbar": { height: { xs: 6, md: 0 } },
+                "&::-webkit-scrollbar-thumb": {
+                  bgcolor: "text.disabled",
+                  borderRadius: 999,
+                },
+                "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+              }}
+            >
+              {stepMeta.map((item, idx) => {
+                const status = stepStatus[item.key];
+                const isActive = status === "active";
+                const isDone = status === "done";
+                const baseBg =
+                  status === "pending"
+                    ? "background.paper"
+                    : isActive
+                    ? theme.palette.mode === "dark"
+                      ? "rgba(59,130,246,0.14)"
+                      : "rgba(59,130,246,0.12)"
+                    : theme.palette.mode === "dark"
+                    ? "rgba(34,197,94,0.16)"
+                    : "rgba(34,197,94,0.12)";
+                const borderColor = isActive
+                  ? theme.palette.primary.main
+                  : isDone
+                  ? theme.palette.success.main
+                  : "divider";
+                const iconColor = isDone
+                  ? theme.palette.success.main
+                  : isActive
+                  ? theme.palette.primary.main
+                  : theme.palette.text.disabled;
+                const textColor = isActive
+                  ? "text.primary"
+                  : isDone
+                  ? "text.primary"
+                  : "text.secondary";
+
+                return (
+                  <Box
+                    key={item.key}
+                    sx={{
+                      minWidth: { xs: 180, md: "48%" },
+                      maxWidth: { md: "48%" },
+                      flexShrink: 0,
+                      px: 1.25,
+                      py: 1,
+                      borderRadius: 12,
+                      border: "1px solid",
+                      borderColor,
+                      bgcolor: baseBg,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 1,
+                      scrollSnapAlign: { xs: "start", md: "none" },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        bgcolor:
+                          isDone || isActive
+                            ? "common.white"
+                            : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.06)"
+                            : "rgba(0,0,0,0.04)",
+                        border: "1px solid",
+                        borderColor: iconColor,
+                        display: "grid",
+                        placeItems: "center",
+                        color: iconColor,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon
+                        icon={
+                          isDone
+                            ? "mdi:check"
+                            : item.icon || "mdi:checkbox-blank-circle-outline"
+                        }
+                        width={18}
+                        height={18}
+                      />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        fontWeight={isActive ? 700 : 600}
+                        color={textColor}
+                        noWrap
+                      >
+                        {idx + 1}. {item.label}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block" }}
+                        noWrap
+                      >
+                        {item.caption}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+
             <Button
               variant="contained"
               fullWidth
@@ -682,155 +913,220 @@ export default function MapWithSearch() {
                 Change Destination
               </Button>
             )}
+
+            <Divider sx={{ mt: 1.25 }} />
           </Box>
 
-          {/* Summary Card */}
-          {(origin || destination) && (
-            <Card variant="outlined">
-              <CardContent>
-                <Stack spacing={1}>
-                  {origin && (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Origin
-                      </Typography>
-                      <Chip
-                        size="small"
-                        color="success"
-                        variant="outlined"
-                        label="Selected"
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                  )}
-                  {destination && (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Destination
-                      </Typography>
-                      <Chip
-                        size="small"
-                        color="error"
-                        variant="outlined"
-                        label="Selected"
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                  )}
-                  {origin && destination && (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Distance (Haversine)
-                      </Typography>
-                      <Typography variant="body2" color="text.primary">
-                        {(
-                          haversineDistance(origin, destination) / 1000
-                        ).toFixed(2)}{" "}
-                        km
-                      </Typography>
-                    </Box>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
+          <Stack spacing={2} sx={{ pt: 1.5 }}>
+            {/* Summary Card */}
+            {(origin || destination) && (
+              <Card variant="outlined">
+                <CardContent>
+                  <Stack spacing={1}>
+                    {origin && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Origin
+                        </Typography>
+                        <Chip
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                          label="Selected"
+                          sx={{ mt: 0.5 }}
+                        />
+                      </Box>
+                    )}
+                    {destination && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Destination
+                        </Typography>
+                        <Chip
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          label="Selected"
+                          sx={{ mt: 0.5 }}
+                        />
+                      </Box>
+                    )}
+                    {origin && destination && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Distance (Haversine)
+                        </Typography>
+                        <Typography variant="body2" color="text.primary">
+                          {(
+                            haversineDistance(origin, destination) / 1000
+                          ).toFixed(2)}{" "}
+                          km
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Available Modes */}
-          {isLoadingModes && (
-            <Stack spacing={1}>
-              <Skeleton variant="rectangular" height={100} />
-              <Skeleton variant="rectangular" height={100} />
-              <Skeleton variant="rectangular" height={100} />
-            </Stack>
-          )}
+            {/* Available Modes */}
+            {isLoadingModes && (
+              <Stack spacing={1}>
+                <Skeleton variant="rectangular" height={100} />
+                <Skeleton variant="rectangular" height={100} />
+                <Skeleton variant="rectangular" height={100} />
+              </Stack>
+            )}
 
-          {!isLoadingModes && step === "modes" && availableModes && (
-            <Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight="medium"
-                gutterBottom
-                color="text.primary"
+            {/* Step 3: mode selection states */}
+            {!isLoadingModes && step === "modes" && (
+              <>
+                {modesError && (
+                  <Card
+                    variant="outlined"
+                    sx={{ bgcolor: "error.light", color: "error.contrastText" }}
+                  >
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Couldn’t load delivery modes
+                        </Typography>
+                        <Typography variant="body2">{modesError}</Typography>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="inherit"
+                          onClick={() =>
+                            loadAvailableModes(origin, destination)
+                          }
+                          startIcon={<Icon icon="mdi:refresh" />}
+                          sx={{ alignSelf: "flex-start" }}
+                        >
+                          Retry
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {!modesError && !availableModes && (
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Select a delivery mode
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Tap below to load available options for your route.
+                        </Typography>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() =>
+                            loadAvailableModes(origin, destination)
+                          }
+                          startIcon={<Icon icon="mdi:truck-delivery" />}
+                          sx={{ alignSelf: "flex-start" }}
+                        >
+                          Load Modes
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {!modesError && availableModes && (
+                  <Box>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight="medium"
+                      gutterBottom
+                      color="text.primary"
+                    >
+                      Available Delivery Modes
+                    </Typography>
+                    <Box sx={{ mt: 2, mb: 1 }}>
+                      <Swiper
+                        modules={[Navigation, Pagination]}
+                        spaceBetween={12}
+                        slidesPerView={1.2}
+                        navigation
+                        pagination={{ clickable: true }}
+                        breakpoints={{
+                          480: {
+                            slidesPerView: 1.5,
+                          },
+                          640: {
+                            slidesPerView: 2,
+                          },
+                          960: {
+                            slidesPerView: 2.5,
+                          },
+                        }}
+                        style={{
+                          paddingBottom: "40px",
+                          touchAction: "pan-y",
+                        }}
+                      >
+                        {availableModes.modes.map((mode) => (
+                          <SwiperSlide key={mode.mode}>
+                            <ModeCard
+                              mode={mode.mode}
+                              fare={mode.fare}
+                              estimatedDuration={mode.estimatedDuration}
+                              enabled={mode.enabled}
+                              reason={mode.reason}
+                              isSelected={selectedMode === mode.mode}
+                              isSuggested={
+                                availableModes.suggestedMode === mode.mode
+                              }
+                              onClick={() =>
+                                mode.enabled && setSelectedMode(mode.mode)
+                              }
+                            />
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
+                    </Box>
+                  </Box>
+                )}
+              </>
+            )}
+
+            {/* Create Order Button */}
+            {selectedMode && availableModes && (
+              <Button
+                variant="contained"
+                color="success"
+                fullWidth
+                size="large"
+                onClick={handleCreateOrder}
+                disabled={isCreatingOrder}
+                startIcon={
+                  isCreatingOrder ? (
+                    <Icon icon="svg-spinners:3-dots-fade" />
+                  ) : (
+                    <Icon icon="mdi:check-circle" />
+                  )
+                }
               >
-                Available Delivery Modes
-              </Typography>
-              <Box sx={{ mt: 2, mb: 1 }}>
-                <Swiper
-                  modules={[Navigation, Pagination]}
-                  spaceBetween={12}
-                  slidesPerView={1.2}
-                  navigation
-                  pagination={{ clickable: true }}
-                  breakpoints={{
-                    480: {
-                      slidesPerView: 1.5,
-                    },
-                    640: {
-                      slidesPerView: 2,
-                    },
-                    960: {
-                      slidesPerView: 2.5,
-                    },
-                  }}
-                  style={{
-                    paddingBottom: "40px",
-                    touchAction: "pan-y",
-                  }}
-                >
-                  {availableModes.modes.map((mode) => (
-                    <SwiperSlide key={mode.mode}>
-                      <ModeCard
-                        mode={mode.mode}
-                        fare={mode.fare}
-                        estimatedDuration={mode.estimatedDuration}
-                        enabled={mode.enabled}
-                        reason={mode.reason}
-                        isSelected={selectedMode === mode.mode}
-                        isSuggested={availableModes.suggestedMode === mode.mode}
-                        onClick={() =>
-                          mode.enabled && setSelectedMode(mode.mode)
-                        }
-                      />
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </Box>
-            </Box>
-          )}
+                {isCreatingOrder ? "Creating Order..." : "Create Order"}
+              </Button>
+            )}
 
-          {/* Create Order Button */}
-          {selectedMode && availableModes && (
-            <Button
-              variant="contained"
-              color="success"
-              fullWidth
-              size="large"
-              onClick={handleCreateOrder}
-              disabled={isCreatingOrder}
-              startIcon={
-                isCreatingOrder ? (
-                  <Icon icon="svg-spinners:3-dots-fade" />
-                ) : (
-                  <Icon icon="mdi:check-circle" />
-                )
-              }
-            >
-              {isCreatingOrder ? "Creating Order..." : "Create Order"}
-            </Button>
-          )}
-
-          {/* Reset Button */}
-          {(origin || destination) && (
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={handleReset}
-              startIcon={<Icon icon="mdi:refresh" />}
-            >
-              Reset
-            </Button>
-          )}
-        </Stack>
+            {/* Reset Button */}
+            {(origin || destination) && (
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={handleReset}
+                startIcon={<Icon icon="mdi:refresh" />}
+              >
+                Reset
+              </Button>
+            )}
+          </Stack>
+        </Box>
       </Paper>
 
       {/* Waiting Screen */}
