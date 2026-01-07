@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -30,6 +30,12 @@ import {
   useTheme,
   Divider,
   LinearProgress,
+  Fade,
+  Slide,
+  Collapse,
+  Tooltip,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -61,9 +67,28 @@ function FixedCenterPin({ onCenterChange }) {
         transform: "translate(-50%, -100%)",
         zIndex: 1000,
         pointerEvents: "none",
+        filter: "drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3))",
+        animation: "pulse 2s ease-in-out infinite",
+        "@keyframes pulse": {
+          "0%, 100%": {
+            transform: "translate(-50%, -100%) scale(1)",
+          },
+          "50%": {
+            transform: "translate(-50%, -100%) scale(1.05)",
+          },
+        },
       }}
+      aria-hidden="true"
     >
-      <Icon icon="mdi:map-marker" width={34} height={44} color="#3B82F6" />
+      <Icon
+        icon="mdi:map-marker"
+        width={34}
+        height={44}
+        color="#3B82F6"
+        style={{
+          filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))",
+        }}
+      />
     </Box>
   );
 }
@@ -92,6 +117,8 @@ function MapWrapper({ center, setCenter }) {
 function GPSLocationButton({ onLocationFound }) {
   const map = useMap();
   const [isLocating, setIsLocating] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -128,66 +155,142 @@ function GPSLocationButton({ onLocationFound }) {
     <Box
       className="leaflet-top leaflet-right"
       sx={{
-        // Keep it below the profile card (which is top-right on the page)
         marginTop: { xs: "132px", sm: "96px" },
-        marginRight: { xs: "20px", sm: "20px" },
+        marginRight: { xs: "12px", sm: "20px" },
         zIndex: 1500,
       }}
     >
-      <Paper elevation={3} sx={{ p: 0.5 }}>
-        <IconButton
-          onClick={handleGetLocation}
-          disabled={isLocating}
-          size="small"
-          sx={{ bgcolor: "background.paper" }}
-          title="Go to my location"
+      <Tooltip title="Use my current location" arrow placement="left">
+        <Paper
+          elevation={4}
+          sx={{
+            p: 0.5,
+            borderRadius: 2,
+            bgcolor: "background.paper",
+            "&:hover": {
+              boxShadow: 6,
+              transform: "scale(1.05)",
+              transition: "all 0.2s ease-in-out",
+            },
+          }}
         >
-          {isLocating ? (
-            <Icon icon="svg-spinners:3-dots-fade" width={24} height={24} />
-          ) : (
-            <Icon icon="mdi:crosshairs-gps" width={24} height={24} />
-          )}
-        </IconButton>
-      </Paper>
+          <IconButton
+            onClick={handleGetLocation}
+            disabled={isLocating}
+            size={isMobile ? "medium" : "small"}
+            sx={{
+              bgcolor: "background.paper",
+              width: { xs: 44, sm: 40 },
+              height: { xs: 44, sm: 40 },
+              "&:hover": {
+                bgcolor: "action.hover",
+              },
+            }}
+            aria-label="Get current location"
+          >
+            {isLocating ? (
+              <Icon
+                icon="svg-spinners:3-dots-fade"
+                width={isMobile ? 28 : 24}
+                height={isMobile ? 28 : 24}
+              />
+            ) : (
+              <Icon
+                icon="mdi:crosshairs-gps"
+                width={isMobile ? 28 : 24}
+                height={isMobile ? 28 : 24}
+              />
+            )}
+          </IconButton>
+        </Paper>
+      </Tooltip>
     </Box>
   );
 }
 
 // Origin and Destination Markers Component
 function LocationMarkers({ origin, destination }) {
-  // Create custom icons for origin and destination
+  // Create enhanced custom icons for origin and destination with shadows
   const originIcon = new LeafletIcon({
     iconUrl:
       "data:image/svg+xml;base64," +
       btoa(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 24 24" fill="#10b981">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+        <defs>
+          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+            <feOffset dx="0" dy="2" result="offsetblur"/>
+            <feComponentTransfer>
+              <feFuncA type="linear" slope="0.3"/>
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="20" cy="20" r="12" fill="#10b981" filter="url(#shadow)"/>
+        <circle cx="20" cy="20" r="8" fill="#ffffff"/>
+        <path d="M20 2C13.37 2 8 7.37 8 14c0 7 12 22 12 22s12-15 12-22c0-6.63-5.37-12-12-12zm0 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#10b981" opacity="0.9"/>
       </svg>
     `),
-    iconSize: [32, 40],
-    iconAnchor: [16, 40],
-    popupAnchor: [0, -40],
+    iconSize: [40, 50],
+    iconAnchor: [20, 50],
+    popupAnchor: [0, -50],
+    className: "custom-marker-origin",
   });
 
   const destinationIcon = new LeafletIcon({
     iconUrl:
       "data:image/svg+xml;base64," +
       btoa(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 24 24" fill="#ef4444">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+        <defs>
+          <filter id="shadow-red" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+            <feOffset dx="0" dy="2" result="offsetblur"/>
+            <feComponentTransfer>
+              <feFuncA type="linear" slope="0.3"/>
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="20" cy="20" r="12" fill="#ef4444" filter="url(#shadow-red)"/>
+        <circle cx="20" cy="20" r="8" fill="#ffffff"/>
+        <path d="M20 2C13.37 2 8 7.37 8 14c0 7 12 22 12 22s12-15 12-22c0-6.63-5.37-12-12-12zm0 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#ef4444" opacity="0.9"/>
       </svg>
     `),
-    iconSize: [32, 40],
-    iconAnchor: [16, 40],
-    popupAnchor: [0, -40],
+    iconSize: [40, 50],
+    iconAnchor: [20, 50],
+    popupAnchor: [0, -50],
+    className: "custom-marker-destination",
   });
 
   return (
     <>
       {origin && (
-        <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
-          <Popup>
-            <strong>Origin</strong>
+        <Marker
+          position={[origin.lat, origin.lng]}
+          icon={originIcon}
+          zIndexOffset={1000}
+        >
+          <Popup closeButton={true} autoPan={true} className="custom-popup">
+            <Box sx={{ p: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Icon
+                  icon="mdi:map-marker"
+                  width={20}
+                  height={20}
+                  style={{ color: "#10b981" }}
+                />
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Origin Point
+                </Typography>
+              </Box>
+            </Box>
           </Popup>
         </Marker>
       )}
@@ -195,13 +298,192 @@ function LocationMarkers({ origin, destination }) {
         <Marker
           position={[destination.lat, destination.lng]}
           icon={destinationIcon}
+          zIndexOffset={1001}
         >
-          <Popup>
-            <strong>Destination</strong>
+          <Popup closeButton={true} autoPan={true} className="custom-popup">
+            <Box sx={{ p: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Icon
+                  icon="mdi:map-marker-check"
+                  width={20}
+                  height={20}
+                  style={{ color: "#ef4444" }}
+                />
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Destination Point
+                </Typography>
+              </Box>
+            </Box>
           </Popup>
         </Marker>
       )}
     </>
+  );
+}
+
+// Map Style Selector Component
+function MapStyleSelector({ currentStyle, onStyleChange }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [open, setOpen] = useState(false);
+
+  const mapStyles = [
+    {
+      id: "osm",
+      name: "Standard",
+      icon: "mdi:map",
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+    {
+      id: "carto-light",
+      name: "Light",
+      icon: "mdi:map-outline",
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+    {
+      id: "carto-dark",
+      name: "Dark",
+      icon: "mdi:map-marker",
+      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+    {
+      id: "carto-voyager",
+      name: "Voyager",
+      icon: "mdi:compass-outline",
+      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+    {
+      id: "stamen-toner",
+      name: "Toner",
+      icon: "mdi:map-search",
+      url: "https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png",
+      attribution:
+        'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+  ];
+
+  const currentStyleData =
+    mapStyles.find((s) => s.id === currentStyle) || mapStyles[0];
+
+  return (
+    <Box
+      className="leaflet-top leaflet-right"
+      sx={{
+        marginTop: { xs: "180px", sm: "140px" },
+        marginRight: { xs: "12px", sm: "20px" },
+        zIndex: 1500,
+      }}
+    >
+      <Tooltip title="Change map style" arrow placement="left">
+        <Paper
+          elevation={4}
+          sx={{
+            borderRadius: 2,
+            overflow: "hidden",
+            bgcolor: "background.paper",
+          }}
+        >
+          <IconButton
+            onClick={() => setOpen(!open)}
+            size={isMobile ? "medium" : "small"}
+            sx={{
+              bgcolor: "background.paper",
+              width: { xs: 44, sm: 40 },
+              height: { xs: 44, sm: 40 },
+            }}
+            aria-label="Change map style"
+          >
+            <Icon
+              icon={currentStyleData.icon}
+              width={isMobile ? 24 : 20}
+              height={isMobile ? 24 : 20}
+            />
+          </IconButton>
+        </Paper>
+      </Tooltip>
+
+      <Collapse in={open} orientation="vertical">
+        <Paper
+          elevation={6}
+          sx={{
+            mt: 1,
+            borderRadius: 2,
+            overflow: "hidden",
+            bgcolor: "background.paper",
+            minWidth: { xs: 200, sm: 180 },
+            maxHeight: 300,
+            overflowY: "auto",
+          }}
+        >
+          {mapStyles.map((style) => (
+            <Box
+              key={style.id}
+              onClick={() => {
+                onStyleChange(style);
+                setOpen(false);
+              }}
+              sx={{
+                p: 1.5,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                bgcolor:
+                  currentStyle === style.id ? "action.selected" : "transparent",
+                "&:hover": {
+                  bgcolor: "action.hover",
+                },
+                borderBottom: 1,
+                borderColor: "divider",
+                "&:last-child": {
+                  borderBottom: 0,
+                },
+              }}
+            >
+              <Icon
+                icon={style.icon}
+                width={20}
+                height={20}
+                style={{
+                  color:
+                    currentStyle === style.id
+                      ? theme.palette.primary.main
+                      : theme.palette.text.secondary,
+                }}
+              />
+              <Typography
+                variant="body2"
+                fontWeight={currentStyle === style.id ? 600 : 400}
+                color={
+                  currentStyle === style.id ? "primary.main" : "text.primary"
+                }
+              >
+                {style.name}
+              </Typography>
+              {currentStyle === style.id && (
+                <Icon
+                  icon="mdi:check"
+                  width={18}
+                  height={18}
+                  style={{
+                    color: theme.palette.primary.main,
+                    marginLeft: "auto",
+                  }}
+                />
+              )}
+            </Box>
+          ))}
+        </Paper>
+      </Collapse>
+    </Box>
   );
 }
 
@@ -211,19 +493,27 @@ function MapContainerWrapper({
   onLocationFound,
   origin,
   destination,
+  mapStyle,
 }) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === "dark";
+
   return (
     <MapContainer
       center={center || [35.6892, 51.389]}
       zoom={13}
       style={{ height: "100%", width: "100%" }}
+      zoomControl={true}
+      scrollWheelZoom={true}
+      doubleClickZoom={true}
+      touchZoom={true}
+      dragging={true}
     >
       <TileLayer
-        url={
-          process.env.NEXT_PUBLIC_MAP_TILE_URL ||
-          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        }
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url={mapStyle.url}
+        attribution={mapStyle.attribution}
+        maxZoom={19}
+        minZoom={2}
       />
       <MapWrapper center={center} setCenter={setCenter} />
       <GPSLocationButton onLocationFound={onLocationFound} />
@@ -252,29 +542,81 @@ export default function MapWithSearch() {
   const [createdOrder, setCreatedOrder] = useState(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [modesError, setModesError] = useState(null);
+  const [searchError, setSearchError] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+  const [mapStyle, setMapStyle] = useState(() => {
+    // Initialize with theme-appropriate style
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mapStyle");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          // Fallback to default
+        }
+      }
+    }
+    // Default based on theme or use Carto Light
+    return {
+      id: "carto-light",
+      name: "Light",
+      icon: "mdi:map-outline",
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    };
+  });
   const searchTimeoutRef = useRef(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
+  // Save map style to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && mapStyle) {
+      localStorage.setItem("mapStyle", JSON.stringify(mapStyle));
+    }
+  }, [mapStyle]);
+
+  // Handle map style change
+  const handleMapStyleChange = useCallback((newStyle) => {
+    setMapStyle(newStyle);
+  }, []);
 
   // Lightweight step status for responsive “mini stepper”
-  const stepOrder = ["origin", "destination", "modes"];
-  const currentStepIndex = stepOrder.indexOf(step);
-  const progressValue =
-    ((currentStepIndex >= 0 ? currentStepIndex + 1 : 0) / stepOrder.length) *
-    100;
+  const stepOrder = useMemo(() => ["origin", "destination", "modes"], []);
+  const currentStepIndex = useMemo(
+    () => stepOrder.indexOf(step),
+    [stepOrder, step]
+  );
+  const progressValue = useMemo(
+    () =>
+      ((currentStepIndex >= 0 ? currentStepIndex + 1 : 0) / stepOrder.length) *
+      100,
+    [currentStepIndex, stepOrder.length]
+  );
 
-  const stepStatus = {
-    origin: step === "origin" ? "active" : origin ? "done" : "pending",
-    destination:
-      step === "destination"
-        ? "active"
-        : destination
-        ? "done"
-        : origin
-        ? "pending"
-        : "pending",
-    modes: step === "modes" ? "active" : selectedMode ? "done" : "pending",
-  };
+  const stepStatus = useMemo(
+    () => ({
+      origin: step === "origin" ? "active" : origin ? "done" : "pending",
+      destination:
+        step === "destination"
+          ? "active"
+          : destination
+          ? "done"
+          : origin
+          ? "pending"
+          : "pending",
+      modes: step === "modes" ? "active" : selectedMode ? "done" : "pending",
+    }),
+    [step, origin, destination, selectedMode]
+  );
 
   const stepMeta = [
     {
@@ -297,24 +639,45 @@ export default function MapWithSearch() {
     },
   ];
 
-  // Search Nominatim
+  // Search Nominatim with improved error handling
   const searchNominatim = useCallback(async (query) => {
     if (!query || query.length < 3) {
       setSuggestions([]);
+      setSearchError(null);
+      setIsSearching(false);
       return;
     }
+
+    setIsSearching(true);
+    setSearchError(null);
 
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
           query
-        )}&format=json&addressdetails=1&limit=5`
+        )}&format=json&addressdetails=1&limit=5`,
+        {
+          headers: {
+            "User-Agent": "Deliverino/1.0",
+          },
+        }
       );
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
       const data = await response.json();
       setSuggestions(data);
+      if (data.length === 0) {
+        setSearchError("No locations found. Try a different search term.");
+      }
     } catch (error) {
       console.error("Error searching Nominatim:", error);
       setSuggestions([]);
+      setSearchError("Search temporarily unavailable. Please try again.");
+    } finally {
+      setIsSearching(false);
     }
   }, []);
 
@@ -328,8 +691,10 @@ export default function MapWithSearch() {
         searchNominatim(searchQuery);
       } else {
         setSuggestions([]);
+        setSearchError(null);
+        setIsSearching(false);
       }
-    }, 300);
+    }, 400); // Slightly longer debounce for better performance
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -371,10 +736,14 @@ export default function MapWithSearch() {
       }
     } catch (error) {
       console.error("Error loading available modes:", error);
-      setModesError(
-        error?.message || "Failed to load delivery modes. Please try again."
-      );
-      alert("Failed to load delivery modes. Please try again.");
+      const errorMessage =
+        error?.message || "Failed to load delivery modes. Please try again.";
+      setModesError(errorMessage);
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: "error",
+      });
     } finally {
       setIsLoadingModes(false);
     }
@@ -433,7 +802,11 @@ export default function MapWithSearch() {
       typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
     if (!token) {
-      alert("Please login first to create an order.");
+      setSnackbar({
+        open: true,
+        message: "Please login first to create an order.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -465,6 +838,12 @@ export default function MapWithSearch() {
       const data = await response.json();
       setCreatedOrder(data.order);
 
+      setSnackbar({
+        open: true,
+        message: "Order created successfully! Redirecting...",
+        severity: "success",
+      });
+
       // Redirect to order status page after showing success message
       setTimeout(() => {
         if (typeof window !== "undefined") {
@@ -473,7 +852,11 @@ export default function MapWithSearch() {
       }, 2000);
     } catch (error) {
       console.error("Error creating order:", error);
-      alert(error.message || "Failed to create order. Please try again.");
+      setSnackbar({
+        open: true,
+        message: error.message || "Failed to create order. Please try again.",
+        severity: "error",
+      });
     } finally {
       setIsCreatingOrder(false);
     }
@@ -490,13 +873,16 @@ export default function MapWithSearch() {
   };
 
   // Handle suggestion click
-  const handleSuggestionClick = (suggestion) => {
+  const handleSuggestionClick = useCallback((suggestion) => {
     const lat = parseFloat(suggestion.lat);
     const lng = parseFloat(suggestion.lon);
-    setMapCenter([lat, lng]);
-    setSearchQuery(suggestion.display_name);
-    setShowSuggestions(false);
-  };
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setMapCenter([lat, lng]);
+      setSearchQuery(suggestion.display_name);
+      setShowSuggestions(false);
+      setSearchError(null);
+    }
+  }, []);
 
   return (
     <Box
@@ -514,22 +900,21 @@ export default function MapWithSearch() {
         elevation={4}
         sx={{
           position: "absolute",
-          top: { xs: 8, sm: 16 },
-          left: { xs: 8, sm: 16 },
-          right: { xs: 8, sm: 360 }, // Leave space for user card on larger screens
-          maxWidth: { xs: "calc(100% - 16px)", sm: 500 },
+          top: { xs: 12, sm: 16 },
+          left: { xs: 12, sm: 16 },
+          right: { xs: 12, md: 360 }, // Leave space for user card on larger screens
+          maxWidth: { xs: "calc(100% - 24px)", sm: 500, md: 600 },
           zIndex: 2000,
           bgcolor: (t) =>
             t.palette.mode === "dark"
-              ? "rgba(18,18,18,0.88)"
-              : "rgba(255,255,255,0.92)",
-          backdropFilter: "blur(10px)",
-          borderRadius: 2,
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-          // Ensure it doesn't overlap with user card on mobile
-          "@media (max-width: 600px)": {
-            right: 8,
-            maxWidth: "calc(100% - 16px)",
+              ? "rgba(18,18,18,0.95)"
+              : "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(12px)",
+          borderRadius: { xs: 3, sm: 2 },
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+          transition: "all 0.2s ease-in-out",
+          "&:hover": {
+            boxShadow: "0 6px 24px rgba(0, 0, 0, 0.2)",
           },
         }}
       >
@@ -543,12 +928,17 @@ export default function MapWithSearch() {
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              // Delay hiding suggestions to allow click
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
             variant="outlined"
-            size="small"
+            size={isMobile ? "medium" : "small"}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
+                borderRadius: { xs: 3, sm: 2 },
                 bgcolor: "background.paper",
+                fontSize: { xs: "1rem", sm: "0.875rem" },
                 "&:hover": {
                   bgcolor: "background.paper",
                 },
@@ -559,65 +949,126 @@ export default function MapWithSearch() {
             }}
             InputProps={{
               startAdornment: (
-                <Icon
-                  icon="mdi:magnify"
-                  width={20}
-                  style={{ marginRight: 8, color: "inherit", opacity: 0.7 }}
-                />
+                <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+                  {isSearching ? (
+                    <Icon
+                      icon="svg-spinners:3-dots-fade"
+                      width={isMobile ? 24 : 20}
+                      height={isMobile ? 24 : 20}
+                      style={{ color: "inherit", opacity: 0.7 }}
+                    />
+                  ) : (
+                    <Icon
+                      icon="mdi:magnify"
+                      width={isMobile ? 24 : 20}
+                      height={isMobile ? 24 : 20}
+                      style={{ color: "inherit", opacity: 0.7 }}
+                    />
+                  )}
+                </Box>
               ),
             }}
+            aria-label="Search for address"
           />
-          {showSuggestions && suggestions.length > 0 && (
+          <Collapse
+            in={showSuggestions && (suggestions.length > 0 || searchError)}
+          >
             <Paper
-              elevation={4}
+              elevation={6}
               sx={{
                 position: "absolute",
                 top: "100%",
                 left: 0,
                 right: 0,
                 mt: 0.5,
-                maxHeight: 280,
+                maxHeight: { xs: 300, sm: 320 },
                 overflow: "auto",
                 zIndex: 1001,
                 bgcolor: "background.paper",
-                borderRadius: 2,
+                borderRadius: { xs: 3, sm: 2 },
                 border: 1,
                 borderColor: "divider",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
               }}
             >
+              {searchError && (
+                <Box sx={{ p: 2 }}>
+                  <Alert severity="info" sx={{ fontSize: "0.875rem" }}>
+                    {searchError}
+                  </Alert>
+                </Box>
+              )}
               {suggestions.map((suggestion, index) => (
                 <Box
-                  key={index}
+                  key={`${suggestion.place_id || index}-${suggestion.lat}-${
+                    suggestion.lon
+                  }`}
                   onClick={() => handleSuggestionClick(suggestion)}
+                  onMouseDown={(e) => e.preventDefault()} // Prevent blur
                   sx={{
-                    p: 2,
+                    p: { xs: 2, sm: 1.75 },
                     cursor: "pointer",
-                    "&:hover": { bgcolor: "action.hover" },
+                    "&:hover": {
+                      bgcolor: "action.hover",
+                      transition: "background-color 0.15s ease",
+                    },
+                    "&:active": {
+                      bgcolor: "action.selected",
+                    },
                     borderBottom: index < suggestions.length - 1 ? 1 : 0,
                     borderColor: "divider",
+                    transition: "background-color 0.15s ease",
                   }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSuggestionClick(suggestion);
+                    }
+                  }}
+                  aria-label={`Select ${suggestion.display_name}`}
                 >
                   <Typography
                     variant="body2"
                     fontWeight="medium"
                     color="text.primary"
+                    sx={{
+                      fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+                      lineHeight: 1.5,
+                    }}
                   >
                     {suggestion.display_name}
                   </Typography>
                 </Box>
               ))}
             </Paper>
-          )}
+          </Collapse>
         </Box>
       </Paper>
 
       {/* Map */}
-      <Box sx={{ flex: 1, position: "relative" }}>
+      <Box
+        sx={{
+          flex: 1,
+          position: "relative",
+          "& .leaflet-container": {
+            filter:
+              mapStyle.id === "carto-dark"
+                ? "brightness(0.95) contrast(1.05)"
+                : mapStyle.id === "stamen-toner"
+                ? "contrast(1.1) saturate(0.9)"
+                : "brightness(1.02) contrast(1.02) saturate(1.05)",
+            transition: "filter 0.3s ease-in-out",
+          },
+        }}
+      >
         <MapContainerWrapper
           center={mapCenter}
           setCenter={setMapCenter}
           origin={origin}
           destination={destination}
+          mapStyle={mapStyle}
           onLocationFound={(location) => {
             setMapCenter(location);
             if (step === "origin") {
@@ -634,39 +1085,68 @@ export default function MapWithSearch() {
             }
           }}
         />
+        <MapStyleSelector
+          currentStyle={mapStyle.id}
+          onStyleChange={handleMapStyleChange}
+        />
       </Box>
 
-      {/* Control Panel */}
+      {/* Control Panel - Responsive Layout */}
       <Paper
         elevation={6}
         sx={{
           position: "absolute",
-          bottom: { xs: 0, sm: 16 },
-          left: { xs: 0, sm: 16 },
-          right: { xs: 0, sm: "auto" },
-          width: { xs: "100%", sm: 420 },
-          maxWidth: { xs: "100%", sm: 420 },
+          // Mobile: bottom sheet
+          ...(isMobile && {
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: "100%",
+            maxWidth: "100%",
+          }),
+          // Tablet: bottom left
+          ...(isTablet && {
+            bottom: 16,
+            left: 16,
+            right: "auto",
+            width: 420,
+            maxWidth: 420,
+          }),
+          // Desktop: side panel
+          ...(isDesktop && {
+            top: 16,
+            right: 16,
+            bottom: 16,
+            left: "auto",
+            width: 400,
+            maxWidth: 400,
+          }),
           zIndex: 1000,
-          p: { xs: 1.5, sm: 2 },
-          pt: { xs: 1, sm: 2 },
+          p: { xs: 2, sm: 2.5 },
+          pt: { xs: 1.5, sm: 2.5 },
           pb: {
-            xs: "calc(env(safe-area-inset-bottom) + 12px)",
-            sm: 2,
+            xs: "calc(env(safe-area-inset-bottom) + 16px)",
+            sm: 2.5,
           },
           bgcolor: (t) =>
             t.palette.mode === "dark"
-              ? "rgba(18,18,18,0.92)"
-              : "rgba(255,255,255,0.96)",
-          backdropFilter: "blur(12px)",
-          borderTopLeftRadius: { xs: 18, sm: 12 },
-          borderTopRightRadius: { xs: 18, sm: 12 },
-          borderBottomLeftRadius: { xs: 0, sm: 12 },
-          borderBottomRightRadius: { xs: 0, sm: 12 },
+              ? "rgba(18,18,18,0.96)"
+              : "rgba(255,255,255,0.98)",
+          backdropFilter: "blur(16px)",
+          borderTopLeftRadius: { xs: 24, sm: 16 },
+          borderTopRightRadius: { xs: 24, sm: 16 },
+          borderBottomLeftRadius: { xs: 0, sm: 16 },
+          borderBottomRightRadius: { xs: 0, sm: 16 },
           boxShadow: isMobile
-            ? "0 -12px 28px rgba(0,0,0,0.22)"
-            : "0 10px 28px rgba(0,0,0,0.18)",
-          maxHeight: { xs: "56vh", sm: "auto" },
-          overflow: "hidden", // prevent rounded-corner clipping while scrolling
+            ? "0 -16px 40px rgba(0,0,0,0.25)"
+            : "0 12px 32px rgba(0,0,0,0.2)",
+          maxHeight: {
+            xs: "65vh",
+            sm: "75vh",
+            md: "calc(100vh - 32px)",
+          },
+          overflow: "hidden",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
         <Box
@@ -694,12 +1174,16 @@ export default function MapWithSearch() {
             {isMobile && (
               <Box
                 sx={{
-                  width: 44,
-                  height: 4,
+                  width: 48,
+                  height: 5,
                   borderRadius: 999,
                   bgcolor: "divider",
                   mx: "auto",
-                  mb: 0.75,
+                  mb: 1.5,
+                  cursor: "grab",
+                  "&:active": {
+                    cursor: "grabbing",
+                  },
                 }}
               />
             )}
@@ -891,9 +1375,28 @@ export default function MapWithSearch() {
                       ? "mdi:map-marker-check"
                       : "mdi:check-circle"
                   }
+                  width={isMobile ? 24 : 20}
+                  height={isMobile ? 24 : 20}
                 />
               }
-              sx={{ py: 1.2 }}
+              sx={{
+                py: { xs: 1.5, sm: 1.2 },
+                fontSize: { xs: "1rem", sm: "0.875rem" },
+                fontWeight: 600,
+                minHeight: { xs: 48, sm: 44 },
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                  boxShadow: 4,
+                },
+                transition: "all 0.2s ease-in-out",
+              }}
+              aria-label={
+                step === "origin"
+                  ? "Set origin location"
+                  : step === "destination"
+                  ? "Confirm destination location"
+                  : "Destination confirmed"
+              }
             >
               {step === "origin"
                 ? "Set Origin"
@@ -904,11 +1407,23 @@ export default function MapWithSearch() {
 
             {step === "modes" && (
               <Button
-                sx={{ mt: 1 }}
+                sx={{
+                  mt: 1,
+                  py: { xs: 1.25, sm: 1 },
+                  fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+                  minHeight: { xs: 44, sm: 40 },
+                }}
                 variant="outlined"
                 fullWidth
                 onClick={handleChangeDestination}
-                startIcon={<Icon icon="mdi:pencil" />}
+                startIcon={
+                  <Icon
+                    icon="mdi:pencil"
+                    width={isMobile ? 20 : 18}
+                    height={isMobile ? 20 : 18}
+                  />
+                }
+                aria-label="Change destination"
               >
                 Change Destination
               </Button>
@@ -920,53 +1435,164 @@ export default function MapWithSearch() {
           <Stack spacing={2} sx={{ pt: 1.5 }}>
             {/* Summary Card */}
             {(origin || destination) && (
-              <Card variant="outlined">
-                <CardContent>
-                  <Stack spacing={1}>
-                    {origin && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Origin
-                        </Typography>
-                        <Chip
-                          size="small"
-                          color="success"
-                          variant="outlined"
-                          label="Selected"
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                    )}
-                    {destination && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Destination
-                        </Typography>
-                        <Chip
-                          size="small"
-                          color="error"
-                          variant="outlined"
-                          label="Selected"
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                    )}
-                    {origin && destination && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Distance (Haversine)
-                        </Typography>
-                        <Typography variant="body2" color="text.primary">
-                          {(
-                            haversineDistance(origin, destination) / 1000
-                          ).toFixed(2)}{" "}
-                          km
-                        </Typography>
-                      </Box>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
+              <Fade in={!!(origin || destination)}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    bgcolor: "background.paper",
+                    borderColor: "divider",
+                    "&:hover": {
+                      boxShadow: 2,
+                    },
+                    transition: "all 0.2s ease-in-out",
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 2, sm: 1.75 } }}>
+                    <Stack spacing={1.5}>
+                      {origin && (
+                        <Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mb: 0.5,
+                            }}
+                          >
+                            <Icon
+                              icon="mdi:map-marker"
+                              width={18}
+                              height={18}
+                              style={{ color: "#10b981" }}
+                            />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              fontWeight={600}
+                              sx={{
+                                textTransform: "uppercase",
+                                fontSize: "0.6875rem",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              Origin
+                            </Typography>
+                          </Box>
+                          <Chip
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                            label="Selected"
+                            sx={{
+                              mt: 0.25,
+                              height: { xs: 26, sm: 24 },
+                              fontSize: { xs: "0.75rem", sm: "0.6875rem" },
+                            }}
+                          />
+                        </Box>
+                      )}
+                      {destination && (
+                        <Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mb: 0.5,
+                            }}
+                          >
+                            <Icon
+                              icon="mdi:map-marker-check"
+                              width={18}
+                              height={18}
+                              style={{ color: "#ef4444" }}
+                            />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              fontWeight={600}
+                              sx={{
+                                textTransform: "uppercase",
+                                fontSize: "0.6875rem",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              Destination
+                            </Typography>
+                          </Box>
+                          <Chip
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                            label="Selected"
+                            sx={{
+                              mt: 0.25,
+                              height: { xs: 26, sm: 24 },
+                              fontSize: { xs: "0.75rem", sm: "0.6875rem" },
+                            }}
+                          />
+                        </Box>
+                      )}
+                      {origin && destination && (
+                        <Box
+                          sx={{ pt: 0.5, borderTop: 1, borderColor: "divider" }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mb: 0.5,
+                            }}
+                          >
+                            <Icon
+                              icon="mdi:map-marker-distance"
+                              width={18}
+                              height={18}
+                              style={{
+                                color: theme.palette.text.secondary,
+                                opacity: 0.7,
+                              }}
+                            />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              fontWeight={600}
+                              sx={{
+                                textTransform: "uppercase",
+                                fontSize: "0.6875rem",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              Distance
+                            </Typography>
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            color="text.primary"
+                            fontWeight={600}
+                            sx={{ fontSize: { xs: "1rem", sm: "0.9375rem" } }}
+                          >
+                            {(
+                              haversineDistance(origin, destination) / 1000
+                            ).toFixed(2)}{" "}
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                fontSize: { xs: "0.875rem", sm: "0.8125rem" },
+                              }}
+                            >
+                              km
+                            </Typography>
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Fade>
             )}
 
             {/* Available Modes */}
@@ -1048,25 +1674,39 @@ export default function MapWithSearch() {
                     <Box sx={{ mt: 2, mb: 1 }}>
                       <Swiper
                         modules={[Navigation, Pagination]}
-                        spaceBetween={12}
-                        slidesPerView={1.2}
-                        navigation
-                        pagination={{ clickable: true }}
+                        spaceBetween={isMobile ? 16 : 12}
+                        slidesPerView={isMobile ? 1.15 : isTablet ? 1.5 : 2}
+                        navigation={!isMobile}
+                        pagination={{
+                          clickable: true,
+                          dynamicBullets: true,
+                          bulletClass: "swiper-pagination-bullet",
+                        }}
                         breakpoints={{
                           480: {
-                            slidesPerView: 1.5,
+                            slidesPerView: 1.4,
+                            spaceBetween: 14,
                           },
                           640: {
-                            slidesPerView: 2,
+                            slidesPerView: 1.8,
+                            spaceBetween: 12,
                           },
                           960: {
+                            slidesPerView: 2.2,
+                            spaceBetween: 12,
+                          },
+                          1280: {
                             slidesPerView: 2.5,
+                            spaceBetween: 12,
                           },
                         }}
                         style={{
-                          paddingBottom: "40px",
+                          paddingBottom: isMobile ? "48px" : "40px",
                           touchAction: "pan-y",
                         }}
+                        grabCursor={true}
+                        resistance={true}
+                        resistanceRatio={0.85}
                       >
                         {availableModes.modes.map((mode) => (
                           <SwiperSlide key={mode.mode}>
@@ -1095,23 +1735,50 @@ export default function MapWithSearch() {
 
             {/* Create Order Button */}
             {selectedMode && availableModes && (
-              <Button
-                variant="contained"
-                color="success"
-                fullWidth
-                size="large"
-                onClick={handleCreateOrder}
-                disabled={isCreatingOrder}
-                startIcon={
-                  isCreatingOrder ? (
-                    <Icon icon="svg-spinners:3-dots-fade" />
-                  ) : (
-                    <Icon icon="mdi:check-circle" />
-                  )
-                }
-              >
-                {isCreatingOrder ? "Creating Order..." : "Create Order"}
-              </Button>
+              <Fade in={!!selectedMode}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  fullWidth
+                  size={isMobile ? "large" : "medium"}
+                  onClick={handleCreateOrder}
+                  disabled={isCreatingOrder}
+                  startIcon={
+                    isCreatingOrder ? (
+                      <Icon
+                        icon="svg-spinners:3-dots-fade"
+                        width={isMobile ? 24 : 20}
+                        height={isMobile ? 24 : 20}
+                      />
+                    ) : (
+                      <Icon
+                        icon="mdi:check-circle"
+                        width={isMobile ? 24 : 20}
+                        height={isMobile ? 24 : 20}
+                      />
+                    )
+                  }
+                  sx={{
+                    py: { xs: 1.75, sm: 1.5 },
+                    fontSize: { xs: "1.0625rem", sm: "0.9375rem" },
+                    fontWeight: 700,
+                    minHeight: { xs: 52, sm: 48 },
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow: 6,
+                    },
+                    "&:disabled": {
+                      opacity: 0.7,
+                    },
+                    transition: "all 0.2s ease-in-out",
+                  }}
+                  aria-label={
+                    isCreatingOrder ? "Creating order" : "Create order"
+                  }
+                >
+                  {isCreatingOrder ? "Creating Order..." : "Create Order"}
+                </Button>
+              </Fade>
             )}
 
             {/* Reset Button */}
@@ -1120,7 +1787,19 @@ export default function MapWithSearch() {
                 variant="outlined"
                 fullWidth
                 onClick={handleReset}
-                startIcon={<Icon icon="mdi:refresh" />}
+                startIcon={
+                  <Icon
+                    icon="mdi:refresh"
+                    width={isMobile ? 20 : 18}
+                    height={isMobile ? 20 : 18}
+                  />
+                }
+                sx={{
+                  py: { xs: 1.25, sm: 1 },
+                  fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+                  minHeight: { xs: 44, sm: 40 },
+                }}
+                aria-label="Reset order"
               >
                 Reset
               </Button>
@@ -1136,6 +1815,27 @@ export default function MapWithSearch() {
           onClose={() => setCreatedOrder(null)}
         />
       )}
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        sx={{
+          bottom: { xs: "calc(65vh + 16px)", sm: 24 },
+          zIndex: 3000,
+        }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", fontSize: { xs: "0.9375rem", sm: "0.875rem" } }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
