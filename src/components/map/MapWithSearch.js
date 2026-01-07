@@ -1,15 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  useMap,
-  useMapEvents,
-  Marker,
-  Popup,
-} from "react-leaflet";
-import { Icon as LeafletIcon } from "leaflet";
 import haversineDistance from "haversine-distance";
 import { fixLeafletIcons } from "../../lib/leafletFix";
 import ModeCard from "../ModeCard";
@@ -25,7 +16,6 @@ import {
   CardContent,
   Skeleton,
   Chip,
-  IconButton,
   useMediaQuery,
   useTheme,
   Divider,
@@ -33,494 +23,19 @@ import {
   Fade,
   Slide,
   Collapse,
-  Tooltip,
   Alert,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 
-// Fixed center pin component
-function FixedCenterPin({ onCenterChange }) {
-  const map = useMap();
-  const [currentCenter, setCurrentCenter] = useState(() => {
-    const center = map.getCenter();
-    return [center.lat, center.lng];
-  });
-
-  useMapEvents({
-    move: () => {
-      const center = map.getCenter();
-      const newCenter = [center.lat, center.lng];
-      setCurrentCenter(newCenter);
-      onCenterChange(newCenter);
-    },
-  });
-
-  return (
-    <Box
-      sx={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -100%)",
-        zIndex: 1000,
-        pointerEvents: "none",
-        filter: "drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3))",
-        animation: "pulse 2s ease-in-out infinite",
-        "@keyframes pulse": {
-          "0%, 100%": {
-            transform: "translate(-50%, -100%) scale(1)",
-          },
-          "50%": {
-            transform: "translate(-50%, -100%) scale(1.05)",
-          },
-        },
-      }}
-      aria-hidden="true"
-    >
-      <Icon
-        icon="mdi:map-marker"
-        width={34}
-        height={44}
-        color="#3B82F6"
-        style={{
-          filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))",
-        }}
-      />
-    </Box>
-  );
-}
-
-// Map wrapper component with center update
-function MapWrapper({ center, setCenter }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (center) {
-      map.setView(center, map.getZoom());
-    }
-  }, [center, map]);
-
-  const handleCenterChange = useCallback(
-    (newCenter) => {
-      setCenter(newCenter);
-    },
-    [setCenter]
-  );
-
-  return <FixedCenterPin onCenterChange={handleCenterChange} />;
-}
-
-// GPS Location Button Component (must be inside MapContainer)
-function GPSLocationButton({ onLocationFound }) {
-  const map = useMap();
-  const [isLocating, setIsLocating] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        map.setView([latitude, longitude], 15);
-        if (onLocationFound) {
-          onLocationFound([latitude, longitude]);
-        }
-        setIsLocating(false);
-      },
-      (error) => {
-        console.error("Error getting location:", error);
-        alert(
-          "Failed to get your location. Please enable location permissions."
-        );
-        setIsLocating(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  };
-
-  return (
-    <Box
-      className="leaflet-top leaflet-right"
-      sx={{
-        marginTop: { xs: "132px", sm: "96px" },
-        marginRight: { xs: "12px", sm: "20px" },
-        zIndex: 1500,
-      }}
-    >
-      <Tooltip title="Use my current location" arrow placement="left">
-        <Paper
-          elevation={4}
-          sx={{
-            p: 0.5,
-            borderRadius: 2,
-            bgcolor: "background.paper",
-            "&:hover": {
-              boxShadow: 6,
-              transform: "scale(1.05)",
-              transition: "all 0.2s ease-in-out",
-            },
-          }}
-        >
-          <IconButton
-            onClick={handleGetLocation}
-            disabled={isLocating}
-            size={isMobile ? "medium" : "small"}
-            sx={{
-              bgcolor: "background.paper",
-              width: { xs: 44, sm: 40 },
-              height: { xs: 44, sm: 40 },
-              "&:hover": {
-                bgcolor: "action.hover",
-              },
-            }}
-            aria-label="Get current location"
-          >
-            {isLocating ? (
-              <Icon
-                icon="svg-spinners:3-dots-fade"
-                width={isMobile ? 28 : 24}
-                height={isMobile ? 28 : 24}
-              />
-            ) : (
-              <Icon
-                icon="mdi:crosshairs-gps"
-                width={isMobile ? 28 : 24}
-                height={isMobile ? 28 : 24}
-              />
-            )}
-          </IconButton>
-        </Paper>
-      </Tooltip>
-    </Box>
-  );
-}
-
-// Origin and Destination Markers Component
-function LocationMarkers({ origin, destination }) {
-  // Create enhanced custom icons for origin and destination with shadows
-  const originIcon = new LeafletIcon({
-    iconUrl:
-      "data:image/svg+xml;base64," +
-      btoa(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
-        <defs>
-          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-            <feOffset dx="0" dy="2" result="offsetblur"/>
-            <feComponentTransfer>
-              <feFuncA type="linear" slope="0.3"/>
-            </feComponentTransfer>
-            <feMerge>
-              <feMergeNode/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        <circle cx="20" cy="20" r="12" fill="#10b981" filter="url(#shadow)"/>
-        <circle cx="20" cy="20" r="8" fill="#ffffff"/>
-        <path d="M20 2C13.37 2 8 7.37 8 14c0 7 12 22 12 22s12-15 12-22c0-6.63-5.37-12-12-12zm0 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#10b981" opacity="0.9"/>
-      </svg>
-    `),
-    iconSize: [40, 50],
-    iconAnchor: [20, 50],
-    popupAnchor: [0, -50],
-    className: "custom-marker-origin",
-  });
-
-  const destinationIcon = new LeafletIcon({
-    iconUrl:
-      "data:image/svg+xml;base64," +
-      btoa(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
-        <defs>
-          <filter id="shadow-red" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-            <feOffset dx="0" dy="2" result="offsetblur"/>
-            <feComponentTransfer>
-              <feFuncA type="linear" slope="0.3"/>
-            </feComponentTransfer>
-            <feMerge>
-              <feMergeNode/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        <circle cx="20" cy="20" r="12" fill="#ef4444" filter="url(#shadow-red)"/>
-        <circle cx="20" cy="20" r="8" fill="#ffffff"/>
-        <path d="M20 2C13.37 2 8 7.37 8 14c0 7 12 22 12 22s12-15 12-22c0-6.63-5.37-12-12-12zm0 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#ef4444" opacity="0.9"/>
-      </svg>
-    `),
-    iconSize: [40, 50],
-    iconAnchor: [20, 50],
-    popupAnchor: [0, -50],
-    className: "custom-marker-destination",
-  });
-
-  return (
-    <>
-      {origin && (
-        <Marker
-          position={[origin.lat, origin.lng]}
-          icon={originIcon}
-          zIndexOffset={1000}
-        >
-          <Popup closeButton={true} autoPan={true} className="custom-popup">
-            <Box sx={{ p: 0.5 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Icon
-                  icon="mdi:map-marker"
-                  width={20}
-                  height={20}
-                  style={{ color: "#10b981" }}
-                />
-                <Typography variant="subtitle2" fontWeight={600}>
-                  Origin Point
-                </Typography>
-              </Box>
-            </Box>
-          </Popup>
-        </Marker>
-      )}
-      {destination && (
-        <Marker
-          position={[destination.lat, destination.lng]}
-          icon={destinationIcon}
-          zIndexOffset={1001}
-        >
-          <Popup closeButton={true} autoPan={true} className="custom-popup">
-            <Box sx={{ p: 0.5 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Icon
-                  icon="mdi:map-marker-check"
-                  width={20}
-                  height={20}
-                  style={{ color: "#ef4444" }}
-                />
-                <Typography variant="subtitle2" fontWeight={600}>
-                  Destination Point
-                </Typography>
-              </Box>
-            </Box>
-          </Popup>
-        </Marker>
-      )}
-    </>
-  );
-}
-
-// Map Style Selector Component
-function MapStyleSelector({ currentStyle, onStyleChange }) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const [open, setOpen] = useState(false);
-
-  const mapStyles = [
-    {
-      id: "osm",
-      name: "Standard",
-      icon: "mdi:map",
-      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
-    {
-      id: "carto-light",
-      name: "Light",
-      icon: "mdi:map-outline",
-      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    },
-    {
-      id: "carto-dark",
-      name: "Dark",
-      icon: "mdi:map-marker",
-      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    },
-    {
-      id: "carto-voyager",
-      name: "Voyager",
-      icon: "mdi:compass-outline",
-      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    },
-    {
-      id: "stamen-toner",
-      name: "Toner",
-      icon: "mdi:map-search",
-      url: "https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png",
-      attribution:
-        'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
-  ];
-
-  const currentStyleData =
-    mapStyles.find((s) => s.id === currentStyle) || mapStyles[0];
-
-  return (
-    <Box
-      className="leaflet-top leaflet-right"
-      sx={{
-        marginTop: { xs: "180px", sm: "140px" },
-        marginRight: { xs: "12px", sm: "20px" },
-        zIndex: 1500,
-      }}
-    >
-      <Tooltip title="Change map style" arrow placement="left">
-        <Paper
-          elevation={4}
-          sx={{
-            borderRadius: 2,
-            overflow: "hidden",
-            bgcolor: "background.paper",
-          }}
-        >
-          <IconButton
-            onClick={() => setOpen(!open)}
-            size={isMobile ? "medium" : "small"}
-            sx={{
-              bgcolor: "background.paper",
-              width: { xs: 44, sm: 40 },
-              height: { xs: 44, sm: 40 },
-            }}
-            aria-label="Change map style"
-          >
-            <Icon
-              icon={currentStyleData.icon}
-              width={isMobile ? 24 : 20}
-              height={isMobile ? 24 : 20}
-            />
-          </IconButton>
-        </Paper>
-      </Tooltip>
-
-      <Collapse in={open} orientation="vertical">
-        <Paper
-          elevation={6}
-          sx={{
-            mt: 1,
-            borderRadius: 2,
-            overflow: "hidden",
-            bgcolor: "background.paper",
-            minWidth: { xs: 200, sm: 180 },
-            maxHeight: 300,
-            overflowY: "auto",
-          }}
-        >
-          {mapStyles.map((style) => (
-            <Box
-              key={style.id}
-              onClick={() => {
-                onStyleChange(style);
-                setOpen(false);
-              }}
-              sx={{
-                p: 1.5,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                bgcolor:
-                  currentStyle === style.id ? "action.selected" : "transparent",
-                "&:hover": {
-                  bgcolor: "action.hover",
-                },
-                borderBottom: 1,
-                borderColor: "divider",
-                "&:last-child": {
-                  borderBottom: 0,
-                },
-              }}
-            >
-              <Icon
-                icon={style.icon}
-                width={20}
-                height={20}
-                style={{
-                  color:
-                    currentStyle === style.id
-                      ? theme.palette.primary.main
-                      : theme.palette.text.secondary,
-                }}
-              />
-              <Typography
-                variant="body2"
-                fontWeight={currentStyle === style.id ? 600 : 400}
-                color={
-                  currentStyle === style.id ? "primary.main" : "text.primary"
-                }
-              >
-                {style.name}
-              </Typography>
-              {currentStyle === style.id && (
-                <Icon
-                  icon="mdi:check"
-                  width={18}
-                  height={18}
-                  style={{
-                    color: theme.palette.primary.main,
-                    marginLeft: "auto",
-                  }}
-                />
-              )}
-            </Box>
-          ))}
-        </Paper>
-      </Collapse>
-    </Box>
-  );
-}
-
-function MapContainerWrapper({
-  center,
-  setCenter,
-  onLocationFound,
-  origin,
-  destination,
-  mapStyle,
-}) {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === "dark";
-
-  return (
-    <MapContainer
-      center={center || [35.6892, 51.389]}
-      zoom={13}
-      style={{ height: "100%", width: "100%" }}
-      zoomControl={true}
-      scrollWheelZoom={true}
-      doubleClickZoom={true}
-      touchZoom={true}
-      dragging={true}
-    >
-      <TileLayer
-        url={mapStyle.url}
-        attribution={mapStyle.attribution}
-        maxZoom={19}
-        minZoom={2}
-      />
-      <MapWrapper center={center} setCenter={setCenter} />
-      <GPSLocationButton onLocationFound={onLocationFound} />
-      <LocationMarkers origin={origin} destination={destination} />
-    </MapContainer>
-  );
-}
+import MapContainerWrapper from "./MapWithSearchParts/MapContainerWrapper";
+import MapStyleSelector from "./MapWithSearchParts/MapStyleSelector";
 
 // Main component
 export default function MapWithSearch() {
@@ -528,6 +43,12 @@ export default function MapWithSearch() {
   useEffect(() => {
     fixLeafletIcons();
   }, []);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const mapRef = useRef(null);
 
   const [mapCenter, setMapCenter] = useState([35.6892, 51.389]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -549,6 +70,13 @@ export default function MapWithSearch() {
     message: "",
     severity: "info",
   });
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !localStorage.getItem("onboarding_completed");
+    }
+    return true;
+  });
   const [mapStyle, setMapStyle] = useState(() => {
     // Initialize with theme-appropriate style
     if (typeof window !== "undefined") {
@@ -569,13 +97,11 @@ export default function MapWithSearch() {
       url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      userSet: false,
     };
   });
   const searchTimeoutRef = useRef(null);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
-  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const [isMapMoving, setIsMapMoving] = useState(false); // track drag or pan inertia
 
   // Save map style to localStorage
   useEffect(() => {
@@ -584,9 +110,57 @@ export default function MapWithSearch() {
     }
   }, [mapStyle]);
 
+  // Keep default map style aligned with system theme until user explicitly chooses a style
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (mapStyle?.userSet) return;
+
+    const next =
+      theme.palette.mode === "dark"
+        ? {
+            id: "carto-dark",
+            name: "Dark",
+            icon: "mdi:map-marker",
+            url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            userSet: false,
+          }
+        : {
+            id: "carto-light",
+            name: "Light",
+            icon: "mdi:map-outline",
+            url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            userSet: false,
+          };
+
+    if (mapStyle?.id !== next.id) {
+      setMapStyle(next);
+    }
+  }, [theme.palette.mode, mapStyle?.id, mapStyle?.userSet]);
+
   // Handle map style change
   const handleMapStyleChange = useCallback((newStyle) => {
-    setMapStyle(newStyle);
+    setMapStyle({ ...newStyle, userSet: true });
+    setSnackbar({
+      open: true,
+      message: `Map style changed to ${newStyle.name}`,
+      severity: "success",
+    });
+  }, []);
+
+  // Handle onboarding completion
+  const handleCompleteOnboarding = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("onboarding_completed", "true");
+    }
+    setShowOnboarding(false);
+  }, []);
+
+  const notify = useCallback((message, severity = "info") => {
+    setSnackbar({ open: true, message, severity });
   }, []);
 
   // Lightweight step status for responsive “mini stepper”
@@ -751,8 +325,18 @@ export default function MapWithSearch() {
 
   // Handle setting location (confirm steps)
   const handleSetLocation = () => {
+    if (isMapMoving) {
+      notify("Please wait for the map to stop moving, then confirm.", "info");
+      return;
+    }
+
+    const leafletCenter = mapRef.current?.getCenter?.();
+    const confirmedCenter = leafletCenter
+      ? { lat: leafletCenter.lat, lng: leafletCenter.lng }
+      : { lat: mapCenter[0], lng: mapCenter[1] };
+
     if (step === "origin") {
-      const nextOrigin = { lat: mapCenter[0], lng: mapCenter[1] };
+      const nextOrigin = confirmedCenter;
       setOrigin(nextOrigin);
       setDestination(null);
       setAvailableModes(null);
@@ -760,17 +344,51 @@ export default function MapWithSearch() {
       setCreatedOrder(null);
       setModesError(null);
       setStep("destination");
+      setSnackbar({
+        open: true,
+        message: "Origin set! Now select your destination.",
+        severity: "success",
+      });
       return;
     }
 
     if (step === "destination") {
-      const nextDestination = { lat: mapCenter[0], lng: mapCenter[1] };
+      const nextDestination = confirmedCenter;
+
+      // Validate distance
+      if (origin) {
+        const distance = haversineDistance(origin, nextDestination) / 1000;
+        if (distance < 0.1) {
+          setSnackbar({
+            open: true,
+            message:
+              "Destination is too close to origin. Please select a different location.",
+            severity: "warning",
+          });
+          return;
+        }
+        if (distance > 100) {
+          setSnackbar({
+            open: true,
+            message:
+              "Distance is too far (max 100km). Please select a closer location.",
+            severity: "warning",
+          });
+          return;
+        }
+      }
+
       setDestination(nextDestination);
       setAvailableModes(null);
       setSelectedMode(null);
       setCreatedOrder(null);
       setModesError(null);
       setStep("modes");
+      setSnackbar({
+        open: true,
+        message: "Destination confirmed! Loading delivery modes...",
+        severity: "success",
+      });
       loadAvailableModes(origin, nextDestination);
       return;
     }
@@ -783,6 +401,11 @@ export default function MapWithSearch() {
     setCreatedOrder(null);
     setModesError(null);
     setStep("destination");
+    setSnackbar({
+      open: true,
+      message: "Destination cleared. Please select a new destination.",
+      severity: "info",
+    });
   };
 
   // Handle order creation
@@ -793,7 +416,7 @@ export default function MapWithSearch() {
       (m) => m.mode === selectedMode
     );
     if (!selectedModeData || !selectedModeData.enabled) {
-      alert("Please select a valid delivery mode.");
+      notify("Please select a valid delivery mode.", "warning");
       return;
     }
 
@@ -862,14 +485,20 @@ export default function MapWithSearch() {
     }
   };
 
-  // Reset workflow
+  // Reset workflow with confirmation
   const handleReset = () => {
+    setConfirmResetOpen(true);
+  };
+
+  const confirmReset = () => {
+    setConfirmResetOpen(false);
     setOrigin(null);
     setDestination(null);
     setStep("origin");
     setAvailableModes(null);
     setSelectedMode(null);
     setCreatedOrder(null);
+    notify("Order reset. Start fresh!", "info");
   };
 
   // Handle suggestion click
@@ -890,9 +519,15 @@ export default function MapWithSearch() {
         position: "relative",
         width: "100%",
         height: "100vh",
+        maxHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
+        overflow: "hidden",
+        touchAction: "none", // Prevent default touch behaviors that interfere with map
+        "& > *": {
+          touchAction: "auto", // Re-enable for interactive elements
+        },
       }}
     >
       {/* Search Bar */}
@@ -905,6 +540,7 @@ export default function MapWithSearch() {
           right: { xs: 12, md: 360 }, // Leave space for user card on larger screens
           maxWidth: { xs: "calc(100% - 24px)", sm: 500, md: 600 },
           zIndex: 2000,
+          pointerEvents: "auto",
           bgcolor: (t) =>
             t.palette.mode === "dark"
               ? "rgba(18,18,18,0.95)"
@@ -1052,6 +688,8 @@ export default function MapWithSearch() {
         sx={{
           flex: 1,
           position: "relative",
+          zIndex: 0,
+          overflow: "hidden",
           "& .leaflet-container": {
             filter:
               mapStyle.id === "carto-dark"
@@ -1060,6 +698,19 @@ export default function MapWithSearch() {
                 ? "contrast(1.1) saturate(0.9)"
                 : "brightness(1.02) contrast(1.02) saturate(1.05)",
             transition: "filter 0.3s ease-in-out",
+            cursor: "grab",
+            "&.leaflet-dragging": {
+              cursor: "grabbing",
+            },
+            "& .leaflet-tile-container": {
+              pointerEvents: "auto",
+            },
+            "& .leaflet-tile": {
+              pointerEvents: "auto",
+            },
+          },
+          "& .map-container-interactive": {
+            pointerEvents: "auto",
           },
         }}
       >
@@ -1069,6 +720,11 @@ export default function MapWithSearch() {
           origin={origin}
           destination={destination}
           mapStyle={mapStyle}
+          onNotify={notify}
+          onMovingChange={setIsMapMoving}
+          onMapCreated={(map) => {
+            mapRef.current = map;
+          }}
           onLocationFound={(location) => {
             setMapCenter(location);
             if (step === "origin") {
@@ -1122,6 +778,7 @@ export default function MapWithSearch() {
             maxWidth: 400,
           }),
           zIndex: 1000,
+          pointerEvents: "auto",
           p: { xs: 2, sm: 2.5 },
           pt: { xs: 1.5, sm: 2.5 },
           pb: {
@@ -1152,8 +809,14 @@ export default function MapWithSearch() {
         <Box
           sx={{
             height: "100%",
-            overflow: { xs: "auto", sm: "visible" },
+            overflow: "auto",
             pr: { xs: 0.5, sm: 0 }, // tiny padding so scrollbar (if any) doesn't overlap
+            "&::-webkit-scrollbar": { width: 8 },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: "divider",
+              borderRadius: 999,
+            },
+            "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
           }}
         >
           {/* Sticky step section (prevents “cropped” feel on mobile scroll) */}
@@ -1240,132 +903,142 @@ export default function MapWithSearch() {
             </Box>
 
             {/* Redesigned horizontal stepper pills */}
-            <Box
-              sx={{
-                display: "flex",
-                flexWrap: { xs: "nowrap", md: "wrap" },
-                overflowX: { xs: "auto", md: "visible" },
-                overflowY: "hidden",
-                columnGap: { xs: 1, md: 1.25 },
-                rowGap: { xs: 0, md: 1.25 },
-                mb: 1,
-                pb: 0.5,
-                pr: { xs: 0.5, md: 0 },
-                scrollSnapType: { xs: "x mandatory", md: "none" },
-                "&::-webkit-scrollbar": { height: { xs: 6, md: 0 } },
-                "&::-webkit-scrollbar-thumb": {
-                  bgcolor: "text.disabled",
-                  borderRadius: 999,
-                },
-                "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-              }}
-            >
-              {stepMeta.map((item, idx) => {
-                const status = stepStatus[item.key];
-                const isActive = status === "active";
-                const isDone = status === "done";
-                const baseBg =
-                  status === "pending"
-                    ? "background.paper"
+            <Fade in timeout={600}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: { xs: "nowrap", md: "wrap" },
+                  overflowX: { xs: "auto", md: "visible" },
+                  overflowY: "hidden",
+                  columnGap: { xs: 1, md: 1.25 },
+                  rowGap: { xs: 0, md: 1.25 },
+                  mb: 1,
+                  pb: 0.5,
+                  pr: { xs: 0.5, md: 0 },
+                  scrollSnapType: { xs: "x mandatory", md: "none" },
+                  "&::-webkit-scrollbar": { height: { xs: 6, md: 0 } },
+                  "&::-webkit-scrollbar-thumb": {
+                    bgcolor: "text.disabled",
+                    borderRadius: 999,
+                  },
+                  "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                }}
+              >
+                {stepMeta.map((item, idx) => {
+                  const status = stepStatus[item.key];
+                  const isActive = status === "active";
+                  const isDone = status === "done";
+                  const baseBg =
+                    status === "pending"
+                      ? "background.paper"
+                      : isActive
+                      ? theme.palette.mode === "dark"
+                        ? "rgba(59,130,246,0.14)"
+                        : "rgba(59,130,246,0.12)"
+                      : theme.palette.mode === "dark"
+                      ? "rgba(34,197,94,0.16)"
+                      : "rgba(34,197,94,0.12)";
+                  const borderColor = isActive
+                    ? theme.palette.primary.main
+                    : isDone
+                    ? theme.palette.success.main
+                    : "divider";
+                  const iconColor = isDone
+                    ? theme.palette.success.main
                     : isActive
-                    ? theme.palette.mode === "dark"
-                      ? "rgba(59,130,246,0.14)"
-                      : "rgba(59,130,246,0.12)"
-                    : theme.palette.mode === "dark"
-                    ? "rgba(34,197,94,0.16)"
-                    : "rgba(34,197,94,0.12)";
-                const borderColor = isActive
-                  ? theme.palette.primary.main
-                  : isDone
-                  ? theme.palette.success.main
-                  : "divider";
-                const iconColor = isDone
-                  ? theme.palette.success.main
-                  : isActive
-                  ? theme.palette.primary.main
-                  : theme.palette.text.disabled;
-                const textColor = isActive
-                  ? "text.primary"
-                  : isDone
-                  ? "text.primary"
-                  : "text.secondary";
+                    ? theme.palette.primary.main
+                    : theme.palette.text.disabled;
+                  const textColor = isActive
+                    ? "text.primary"
+                    : isDone
+                    ? "text.primary"
+                    : "text.secondary";
 
-                return (
-                  <Box
-                    key={item.key}
-                    sx={{
-                      minWidth: { xs: 180, md: "48%" },
-                      maxWidth: { md: "48%" },
-                      flexShrink: 0,
-                      px: 1.25,
-                      py: 1,
-                      borderRadius: 12,
-                      border: "1px solid",
-                      borderColor,
-                      bgcolor: baseBg,
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 1,
-                      scrollSnapAlign: { xs: "start", md: "none" },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        bgcolor:
-                          isDone || isActive
-                            ? "common.white"
-                            : theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.06)"
-                            : "rgba(0,0,0,0.04)",
-                        border: "1px solid",
-                        borderColor: iconColor,
-                        display: "grid",
-                        placeItems: "center",
-                        color: iconColor,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon
-                        icon={
-                          isDone
-                            ? "mdi:check"
-                            : item.icon || "mdi:checkbox-blank-circle-outline"
-                        }
-                        width={18}
-                        height={18}
-                      />
-                    </Box>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        fontWeight={isActive ? 700 : 600}
-                        color={textColor}
-                        noWrap
+                  return (
+                    <Fade in timeout={400 + idx * 200} key={item.key}>
+                      <Box
+                        sx={{
+                          minWidth: { xs: 180, md: "48%" },
+                          maxWidth: { md: "48%" },
+                          flexShrink: 0,
+                          px: 1.25,
+                          py: 1,
+                          borderRadius: 12,
+                          border: "1px solid",
+                          borderColor,
+                          bgcolor: baseBg,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 1,
+                          scrollSnapAlign: { xs: "start", md: "none" },
+                          transition: "all 0.3s ease-in-out",
+                          "&:hover": {
+                            transform:
+                              isActive || isDone ? "translateY(-2px)" : "none",
+                            boxShadow: isActive || isDone ? 2 : 0,
+                          },
+                        }}
                       >
-                        {idx + 1}. {item.label}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block" }}
-                        noWrap
-                      >
-                        {item.caption}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            bgcolor:
+                              isDone || isActive
+                                ? "common.white"
+                                : theme.palette.mode === "dark"
+                                ? "rgba(255,255,255,0.06)"
+                                : "rgba(0,0,0,0.04)",
+                            border: "1px solid",
+                            borderColor: iconColor,
+                            display: "grid",
+                            placeItems: "center",
+                            color: iconColor,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon
+                            icon={
+                              isDone
+                                ? "mdi:check"
+                                : item.icon ||
+                                  "mdi:checkbox-blank-circle-outline"
+                            }
+                            width={18}
+                            height={18}
+                          />
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight={isActive ? 700 : 600}
+                            color={textColor}
+                            noWrap
+                          >
+                            {idx + 1}. {item.label}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block" }}
+                            noWrap
+                          >
+                            {item.caption}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Fade>
+                  );
+                })}
+              </Box>
+            </Fade>
 
             <Button
               variant="contained"
               fullWidth
               onClick={handleSetLocation}
-              disabled={step === "modes"}
+              disabled={step === "modes" || isMapMoving}
               startIcon={
                 <Icon
                   icon={
@@ -1384,9 +1057,25 @@ export default function MapWithSearch() {
                 fontSize: { xs: "1rem", sm: "0.875rem" },
                 fontWeight: 600,
                 minHeight: { xs: 48, sm: 44 },
+                position: "relative",
+                overflow: "hidden",
                 "&:hover": {
                   transform: "translateY(-1px)",
                   boxShadow: 4,
+                  "&::after": {
+                    transform: "translateX(100%)",
+                  },
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  left: "-100%",
+                  width: "100%",
+                  height: "100%",
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)",
+                  transition: "transform 0.6s ease",
                 },
                 transition: "all 0.2s ease-in-out",
               }}
@@ -1398,7 +1087,9 @@ export default function MapWithSearch() {
                   : "Destination confirmed"
               }
             >
-              {step === "origin"
+              {isMapMoving
+                ? "Map moving..."
+                : step === "origin"
                 ? "Set Origin"
                 : step === "destination"
                 ? "Confirm Destination"
@@ -1595,44 +1286,185 @@ export default function MapWithSearch() {
               </Fade>
             )}
 
-            {/* Available Modes */}
+            {/* Available Modes Loading */}
             {isLoadingModes && (
-              <Stack spacing={1}>
-                <Skeleton variant="rectangular" height={100} />
-                <Skeleton variant="rectangular" height={100} />
-                <Skeleton variant="rectangular" height={100} />
-              </Stack>
+              <Fade in timeout={300}>
+                <Stack spacing={2}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Icon
+                      icon="svg-spinners:3-dots-fade"
+                      width={24}
+                      height={24}
+                      style={{ color: theme.palette.primary.main }}
+                    />
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      fontWeight={600}
+                    >
+                      Loading delivery modes...
+                    </Typography>
+                  </Box>
+                  {[0, 1, 2].map((i) => (
+                    <Card
+                      key={i}
+                      variant="outlined"
+                      sx={{ bgcolor: "background.paper" }}
+                    >
+                      <CardContent sx={{ p: { xs: 2, sm: 1.75 } }}>
+                        <Stack
+                          direction="row"
+                          spacing={2}
+                          alignItems="flex-start"
+                        >
+                          <Skeleton
+                            variant="rectangular"
+                            width={56}
+                            height={56}
+                            sx={{ borderRadius: 2.5 }}
+                          />
+                          <Box sx={{ flex: 1 }}>
+                            <Stack spacing={1}>
+                              <Skeleton
+                                variant="text"
+                                width="60%"
+                                height={24}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="40%"
+                                height={20}
+                              />
+                              <Skeleton
+                                variant="text"
+                                width="50%"
+                                height={20}
+                              />
+                            </Stack>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Fade>
             )}
 
             {/* Step 3: mode selection states */}
             {!isLoadingModes && step === "modes" && (
               <>
                 {modesError && (
-                  <Card
-                    variant="outlined"
-                    sx={{ bgcolor: "error.light", color: "error.contrastText" }}
-                  >
-                    <CardContent>
-                      <Stack spacing={1}>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          Couldn’t load delivery modes
-                        </Typography>
-                        <Typography variant="body2">{modesError}</Typography>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="inherit"
-                          onClick={() =>
-                            loadAvailableModes(origin, destination)
-                          }
-                          startIcon={<Icon icon="mdi:refresh" />}
-                          sx={{ alignSelf: "flex-start" }}
-                        >
-                          Retry
-                        </Button>
-                      </Stack>
-                    </CardContent>
-                  </Card>
+                  <Fade in timeout={400}>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        bgcolor: (t) =>
+                          t.palette.mode === "dark"
+                            ? "rgba(239, 68, 68, 0.1)"
+                            : "rgba(239, 68, 68, 0.05)",
+                        borderColor: "error.main",
+                        borderWidth: 1.5,
+                      }}
+                    >
+                      <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                        <Stack spacing={2}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: "50%",
+                                bgcolor: "error.main",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Icon
+                                icon="mdi:alert-circle"
+                                width={24}
+                                height={24}
+                              />
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography
+                                variant="subtitle2"
+                                fontWeight={700}
+                                color="error.main"
+                                sx={{
+                                  fontSize: { xs: "0.9375rem", sm: "1rem" },
+                                }}
+                              >
+                                Couldn't Load Delivery Modes
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  mt: 0.5,
+                                  fontSize: { xs: "0.875rem", sm: "0.9375rem" },
+                                }}
+                              >
+                                {modesError}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size={isMobile ? "medium" : "small"}
+                              variant="contained"
+                              color="error"
+                              onClick={() =>
+                                loadAvailableModes(origin, destination)
+                              }
+                              startIcon={
+                                <Icon
+                                  icon="mdi:refresh"
+                                  width={18}
+                                  height={18}
+                                />
+                              }
+                              sx={{
+                                flex: 1,
+                                py: { xs: 1.25, sm: 1 },
+                                fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+                              }}
+                            >
+                              Retry
+                            </Button>
+                            <Button
+                              size={isMobile ? "medium" : "small"}
+                              variant="outlined"
+                              color="error"
+                              onClick={handleChangeDestination}
+                              startIcon={
+                                <Icon
+                                  icon="mdi:map-marker"
+                                  width={18}
+                                  height={18}
+                                />
+                              }
+                              sx={{
+                                flex: 1,
+                                py: { xs: 1.25, sm: 1 },
+                                fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+                              }}
+                            >
+                              Change Location
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Fade>
                 )}
 
                 {!modesError && !availableModes && (
@@ -1662,73 +1494,94 @@ export default function MapWithSearch() {
                 )}
 
                 {!modesError && availableModes && (
-                  <Box>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="medium"
-                      gutterBottom
-                      color="text.primary"
-                    >
-                      Available Delivery Modes
-                    </Typography>
-                    <Box sx={{ mt: 2, mb: 1 }}>
-                      <Swiper
-                        modules={[Navigation, Pagination]}
-                        spaceBetween={isMobile ? 16 : 12}
-                        slidesPerView={isMobile ? 1.15 : isTablet ? 1.5 : 2}
-                        navigation={!isMobile}
-                        pagination={{
-                          clickable: true,
-                          dynamicBullets: true,
-                          bulletClass: "swiper-pagination-bullet",
+                  <Fade in timeout={600}>
+                    <Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 2,
                         }}
-                        breakpoints={{
-                          480: {
-                            slidesPerView: 1.4,
-                            spaceBetween: 14,
-                          },
-                          640: {
-                            slidesPerView: 1.8,
-                            spaceBetween: 12,
-                          },
-                          960: {
-                            slidesPerView: 2.2,
-                            spaceBetween: 12,
-                          },
-                          1280: {
-                            slidesPerView: 2.5,
-                            spaceBetween: 12,
-                          },
-                        }}
-                        style={{
-                          paddingBottom: isMobile ? "48px" : "40px",
-                          touchAction: "pan-y",
-                        }}
-                        grabCursor={true}
-                        resistance={true}
-                        resistanceRatio={0.85}
                       >
-                        {availableModes.modes.map((mode) => (
-                          <SwiperSlide key={mode.mode}>
-                            <ModeCard
-                              mode={mode.mode}
-                              fare={mode.fare}
-                              estimatedDuration={mode.estimatedDuration}
-                              enabled={mode.enabled}
-                              reason={mode.reason}
-                              isSelected={selectedMode === mode.mode}
-                              isSuggested={
-                                availableModes.suggestedMode === mode.mode
-                              }
-                              onClick={() =>
-                                mode.enabled && setSelectedMode(mode.mode)
-                              }
-                            />
-                          </SwiperSlide>
-                        ))}
-                      </Swiper>
+                        <Icon
+                          icon="mdi:truck-delivery"
+                          width={20}
+                          height={20}
+                          style={{ opacity: 0.7 }}
+                        />
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={600}
+                          color="text.primary"
+                          sx={{ fontSize: { xs: "0.9375rem", sm: "0.875rem" } }}
+                        >
+                          Available Delivery Modes
+                        </Typography>
+                      </Box>
+                      <Box sx={{ mt: 2, mb: 1 }}>
+                        <Swiper
+                          modules={[Navigation, Pagination]}
+                          spaceBetween={isMobile ? 16 : 12}
+                          slidesPerView={isMobile ? 1.15 : isTablet ? 1.5 : 2}
+                          navigation={!isMobile}
+                          autoHeight={true}
+                          pagination={{
+                            clickable: true,
+                            dynamicBullets: true,
+                            bulletClass: "swiper-pagination-bullet",
+                          }}
+                          breakpoints={{
+                            480: {
+                              slidesPerView: 1.4,
+                              spaceBetween: 14,
+                            },
+                            640: {
+                              slidesPerView: 1.8,
+                              spaceBetween: 12,
+                            },
+                            960: {
+                              slidesPerView: 2.2,
+                              spaceBetween: 12,
+                            },
+                            1280: {
+                              slidesPerView: 2.5,
+                              spaceBetween: 12,
+                            },
+                          }}
+                          style={{
+                            paddingBottom: isMobile ? "48px" : "40px",
+                            touchAction: "pan-y",
+                          }}
+                          grabCursor={true}
+                          resistance={true}
+                          resistanceRatio={0.85}
+                        >
+                          {availableModes.modes.map((mode) => (
+                            <SwiperSlide
+                              key={mode.mode}
+                              style={{ height: "auto" }}
+                            >
+                              <ModeCard
+                                mode={mode.mode}
+                                fare={mode.fare}
+                                estimatedDuration={mode.estimatedDuration}
+                                enabled={mode.enabled}
+                                reason={mode.reason}
+                                isSelected={selectedMode === mode.mode}
+                                isSuggested={
+                                  availableModes.suggestedMode === mode.mode
+                                }
+                                onClick={() =>
+                                  mode.enabled && setSelectedMode(mode.mode)
+                                }
+                              />
+                            </SwiperSlide>
+                          ))}
+                        </Swiper>
+                      </Box>
                     </Box>
-                  </Box>
+                  </Fade>
                 )}
               </>
             )}
@@ -1831,11 +1684,238 @@ export default function MapWithSearch() {
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: "100%", fontSize: { xs: "0.9375rem", sm: "0.875rem" } }}
+          icon={
+            <Icon
+              icon={
+                snackbar.severity === "success"
+                  ? "mdi:check-circle"
+                  : snackbar.severity === "error"
+                  ? "mdi:alert-circle"
+                  : snackbar.severity === "warning"
+                  ? "mdi:alert"
+                  : "mdi:information"
+              }
+              width={22}
+              height={22}
+            />
+          }
+          sx={{
+            width: "100%",
+            fontSize: { xs: "0.9375rem", sm: "0.875rem" },
+            alignItems: "center",
+            "& .MuiAlert-icon": {
+              fontSize: { xs: "1.5rem", sm: "1.375rem" },
+            },
+          }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm reset dialog */}
+      <Dialog
+        open={confirmResetOpen}
+        onClose={() => setConfirmResetOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Reset order?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This will clear your origin, destination, and selected mode.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmResetOpen(false)} variant="text">
+            Cancel
+          </Button>
+          <Button onClick={confirmReset} color="error" variant="contained">
+            Reset
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Onboarding Dialog */}
+      {showOnboarding && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 5000,
+            width: { xs: "90%", sm: 400 },
+            maxWidth: 500,
+            bgcolor: (t) =>
+              t.palette.mode === "dark"
+                ? "rgba(18,18,18,0.98)"
+                : "rgba(255,255,255,0.98)",
+            backdropFilter: "blur(16px)",
+            borderRadius: 3,
+            p: { xs: 3, sm: 4 },
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          }}
+        >
+          <Box sx={{ textAlign: "center" }}>
+            <Box
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                bgcolor: "primary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 3,
+                boxShadow: "0 8px 24px rgba(59, 130, 246, 0.4)",
+              }}
+            >
+              <Icon
+                icon="mdi:map-marker-path"
+                width={44}
+                height={44}
+                style={{ color: "#fff" }}
+              />
+            </Box>
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              gutterBottom
+              sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
+            >
+              Welcome to Deliverino!
+            </Typography>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ mb: 3, fontSize: { xs: "0.9375rem", sm: "1rem" } }}
+            >
+              Create your delivery in 3 easy steps:
+            </Typography>
+            <Stack spacing={2} sx={{ textAlign: "left", mb: 4 }}>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    bgcolor: "success.main",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    fontWeight: 700,
+                  }}
+                >
+                  1
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Set Your Origin
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Move the map to your pickup location and confirm
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    bgcolor: "primary.main",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    fontWeight: 700,
+                  }}
+                >
+                  2
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Choose Destination
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Select where you want your delivery to go
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    bgcolor: "warning.main",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    fontWeight: 700,
+                  }}
+                >
+                  3
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Select Delivery Mode
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Pick the best option for your delivery needs
+                  </Typography>
+                </Box>
+              </Box>
+            </Stack>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              onClick={handleCompleteOnboarding}
+              startIcon={
+                <Icon icon="mdi:rocket-launch" width={20} height={20} />
+              }
+              sx={{
+                py: 1.5,
+                fontSize: "1rem",
+                fontWeight: 600,
+                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
+                "&:hover": {
+                  boxShadow: "0 6px 16px rgba(59, 130, 246, 0.4)",
+                  transform: "translateY(-2px)",
+                },
+                transition: "all 0.2s ease-in-out",
+              }}
+            >
+              Get Started
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
+      {/* Backdrop for onboarding */}
+      {showOnboarding && (
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(4px)",
+            zIndex: 4999,
+          }}
+          onClick={handleCompleteOnboarding}
+        />
+      )}
     </Box>
   );
 }

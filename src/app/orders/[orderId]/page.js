@@ -25,6 +25,7 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
+  Snackbar,
   Stack,
   Avatar,
   LinearProgress,
@@ -55,9 +56,15 @@ function OrderStatusPageContent() {
   const orderId = params.orderId;
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const [paymentData, setPaymentData] = useState({
     cardNumber: "",
     expiryDate: "",
@@ -79,9 +86,14 @@ function OrderStatusPageContent() {
     ESCALATE: { label: "Escalated", color: "warning", icon: "mdi:alert" },
   };
 
+  const notify = (message, severity = "info") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
   // Load order status
   const loadOrderStatus = async () => {
     try {
+      setLoadError("");
       const headers = {};
       if (token) {
         headers.Authorization = `Bearer ${token}`;
@@ -100,7 +112,8 @@ function OrderStatusPageContent() {
       setPaymentMethod(data.order.paymentMethod || "CASH");
     } catch (error) {
       console.error("Error loading order status:", error);
-      alert("Failed to load order status. Please try again.");
+      setLoadError(error?.message || "Failed to load order status. Please try again.");
+      notify("Failed to load order status. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -220,10 +233,10 @@ function OrderStatusPageContent() {
 
       setShowPaymentForm(false);
       setPaymentData({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
-      alert("Payment completed successfully!");
+      notify("Payment completed successfully!", "success");
     } catch (error) {
       console.error("Error completing payment:", error);
-      alert(error.message || "Failed to complete payment. Please try again.");
+      notify(error.message || "Failed to complete payment. Please try again.", "error");
     } finally {
       setIsProcessingPayment(false);
     }
@@ -261,9 +274,30 @@ function OrderStatusPageContent() {
           bgcolor: "background.default",
         }}
       >
-        <Alert severity="error" icon={<Icon icon="mdi:alert-circle" />}>
-          Order not found
-        </Alert>
+        <Stack spacing={2} sx={{ width: "min(520px, 92vw)" }}>
+          <Alert severity="error" icon={<Icon icon="mdi:alert-circle" />}>
+            {loadError ? loadError : "Order not found"}
+          </Alert>
+          <Stack direction="row" spacing={1.5} justifyContent="center">
+            <Button
+              variant="contained"
+              onClick={() => {
+                setIsLoading(true);
+                loadOrderStatus();
+              }}
+              startIcon={<Icon icon="mdi:refresh" />}
+            >
+              Retry
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => router.push("/")}
+              startIcon={<Icon icon="mdi:home" />}
+            >
+              Home
+            </Button>
+          </Stack>
+        </Stack>
       </Box>
     );
   }
@@ -637,6 +671,22 @@ function OrderStatusPageContent() {
           </DialogActions>
         </Dialog>
       </Container>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

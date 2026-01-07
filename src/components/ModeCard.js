@@ -70,20 +70,31 @@ export default function ModeCard({
           ? "divider" 
           : "action.disabled",
         height: "100%",
-        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         position: "relative",
         overflow: "visible",
+        animation: isSelected ? "slideIn 0.3s ease-out" : "none",
+        "@keyframes slideIn": {
+          "0%": {
+            transform: "scale(0.95)",
+            opacity: 0.8,
+          },
+          "100%": {
+            transform: "scale(1)",
+            opacity: 1,
+          },
+        },
         "&:hover": enabled
           ? {
               borderColor: modeColor,
               boxShadow: isSelected ? 8 : 4,
-              transform: "translateY(-2px)",
+              transform: "translateY(-4px) scale(1.02)",
               borderWidth: 2.5,
             }
           : {},
         "&:active": enabled
           ? {
-              transform: "translateY(0px)",
+              transform: "translateY(-2px) scale(0.98)",
             }
           : {},
         ...(isSelected && {

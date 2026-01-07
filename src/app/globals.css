@@ -24,7 +24,9 @@ body {
 
 /* Improve touch targets on mobile */
 @media (max-width: 600px) {
-  button, a, [role="button"] {
+  button,
+  a,
+  [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
@@ -40,6 +42,54 @@ body {
   z-index: 1;
   /* Improve map rendering on mobile */
   touch-action: pan-x pan-y;
+  /* Fix map dragging */
+  cursor: grab;
+}
+
+.leaflet-container:active {
+  cursor: grabbing;
+}
+
+/* Ensure map tiles are interactive */
+.leaflet-tile-container {
+  pointer-events: auto !important;
+}
+
+.leaflet-tile {
+  pointer-events: auto !important;
+}
+
+/* Fix map pane z-index */
+.leaflet-map-pane {
+  z-index: 0;
+}
+
+.leaflet-tile-pane {
+  z-index: 0;
+}
+
+.leaflet-overlay-pane {
+  z-index: 1;
+}
+
+.leaflet-shadow-pane {
+  z-index: 2;
+}
+
+.leaflet-marker-pane {
+  z-index: 3;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 4;
+}
+
+.leaflet-popup-pane {
+  z-index: 5;
+}
+
+.leaflet-control-container {
+  z-index: 6;
 }
 
 /* Improve Leaflet controls for mobile */
@@ -62,7 +112,17 @@ body {
 /* Swiper improvements */
 .swiper {
   width: 100%;
-  height: 100%;
+}
+
+/* Let swiper grow naturally (prevents weird sizing on desktop/mobile) */
+.swiper,
+.swiper-wrapper,
+.swiper-slide {
+  height: auto;
+}
+
+.swiper-slide {
+  display: flex;
 }
 
 .swiper-pagination {
@@ -100,6 +160,34 @@ body {
 /* Smooth scrolling */
 * {
   scroll-behavior: smooth;
+}
+
+/* Prevent map interaction issues */
+.map-container-interactive {
+  pointer-events: auto !important;
+}
+
+.map-container-interactive .leaflet-pane {
+  pointer-events: auto !important;
+}
+
+/* Ensure map is draggable */
+.leaflet-container.leaflet-touch-drag {
+  cursor: grabbing !important;
+}
+
+.leaflet-container.leaflet-touch-drag .leaflet-map-pane {
+  cursor: grabbing !important;
+}
+
+/* Fix for overlays blocking map */
+.leaflet-overlay-pane svg,
+.leaflet-overlay-pane canvas {
+  pointer-events: none;
+}
+
+.leaflet-marker-pane img {
+  pointer-events: auto;
 }
 
 /* Improve focus visibility for accessibility */
@@ -269,7 +357,8 @@ body {
 }
 
 @keyframes markerPulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {

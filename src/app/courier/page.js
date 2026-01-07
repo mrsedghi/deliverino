@@ -21,6 +21,7 @@ import {
   Avatar,
   Skeleton,
   Alert,
+  Snackbar,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -50,6 +51,15 @@ function CourierPageContent() {
   const [socketConnected, setSocketConnected] = useState(false);
   const [incomingOffer, setIncomingOffer] = useState(null);
   const [vehicleSwiper, setVehicleSwiper] = useState(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  const notify = (message, severity = "info") => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const vehicleIndex = useMemo(() => {
     const idx = VEHICLE_TYPES.findIndex((v) => v.value === vehicleType);
@@ -120,12 +130,12 @@ function CourierPageContent() {
   // Toggle online/offline
   const handleToggleOnline = async () => {
     if (!token) {
-      alert("Please login first. Token not found.");
+      notify("Please login first. Token not found.", "warning");
       return;
     }
 
     if (!location.lat || !location.lng) {
-      alert("Location not available. Please enable location sharing.");
+      notify("Location not available. Please enable location sharing.", "warning");
       return;
     }
 
@@ -158,7 +168,7 @@ function CourierPageContent() {
         loadNearbyOrders();
       } catch (error) {
         console.error("Error going online:", error);
-        alert("Failed to go online. Please try again.");
+        notify("Failed to go online. Please try again.", "error");
       }
     } else {
       try {
@@ -175,9 +185,10 @@ function CourierPageContent() {
 
         setIsOnline(false);
         setNearbyOrders([]);
+        notify("You are now offline.", "info");
       } catch (error) {
         console.error("Error going offline:", error);
-        alert("Failed to go offline. Please try again.");
+        notify("Failed to go offline. Please try again.", "error");
       }
     }
   };
@@ -205,7 +216,7 @@ function CourierPageContent() {
       setNearbyOrders(data.orders || []);
     } catch (error) {
       console.error("Error loading nearby orders:", error);
-      alert("Failed to load nearby orders. Please try again.");
+      notify("Failed to load nearby orders. Please try again.", "error");
     } finally {
       setIsLoadingOrders(false);
     }
@@ -227,12 +238,12 @@ function CourierPageContent() {
         throw new Error(`API returned ${response.status}`);
       }
 
-      alert("Order accepted successfully!");
+      notify("Order accepted successfully!", "success");
       setIncomingOffer(null);
       loadNearbyOrders();
     } catch (error) {
       console.error("Error accepting order:", error);
-      alert("Failed to accept order. Please try again.");
+      notify("Failed to accept order. Please try again.", "error");
     }
   };
 
@@ -256,7 +267,7 @@ function CourierPageContent() {
       loadNearbyOrders();
     } catch (error) {
       console.error("Error rejecting order:", error);
-      alert("Failed to reject order. Please try again.");
+      notify("Failed to reject order. Please try again.", "error");
     }
   };
 
@@ -589,6 +600,21 @@ function CourierPageContent() {
             </DialogActions>
           </Dialog>
         )}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Container>
     </Box>
   );

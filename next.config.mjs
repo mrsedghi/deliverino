@@ -42,6 +42,38 @@ const pwaConfig = withPWA({
       },
     },
     {
+      // CARTO basemaps (light/dark/voyager)
+      urlPattern: /^https:\/\/.*\.basemaps\.cartocdn\.com\/.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "map-tiles-carto",
+        expiration: {
+          maxEntries: 80,
+          maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+        networkTimeoutSeconds: 10,
+      },
+    },
+    {
+      // Stamen tiles (toner, etc.)
+      urlPattern: /^https:\/\/stamen-tiles-.*\.a\.ssl\.fastly\.net\/.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "map-tiles-stamen",
+        expiration: {
+          maxEntries: 80,
+          maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+        networkTimeoutSeconds: 10,
+      },
+    },
+    {
       urlPattern: /^https:\/\/nominatim\.openstreetmap\.org\/.*/i,
       handler: "NetworkFirst",
       options: {
